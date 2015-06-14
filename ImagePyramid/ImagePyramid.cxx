@@ -24,6 +24,8 @@
 
 #include <vtkImageResize.h>
 #include "vtkImageSincInterpolator.h"
+#include <vtkImageRGBToYIQ.h>
+
 
 // typedef int* imageType;
 
@@ -52,73 +54,109 @@ int main(int argc, char* argv[])
   imageReader->Update();
 
 
-  // Somehow get the image pixel height and width from the above image reader. Search for functions
+  //--------------This part should go into an extract YIQ filter----------------
+  vtkSmartPointer<vtkImageRGBToYIQ> yiqFilter =
+    vtkSmartPointer<vtkImageRGBToYIQ>::New();
+  yiqFilter->SetInputConnection(imageReader->GetOutputPort());
+  yiqFilter->Update();
+ 
   vtkSmartPointer<vtkImageExtractComponents> extractYFilter =
     vtkSmartPointer<vtkImageExtractComponents>::New();
-  extractYFilter->SetInputConnection(imageReader->GetOutputPort());
+  extractYFilter->SetInputConnection(yiqFilter->GetOutputPort());
   extractYFilter->SetComponents(0);
   extractYFilter->Update();
  
   vtkSmartPointer<vtkImageExtractComponents> extractIFilter =
     vtkSmartPointer<vtkImageExtractComponents>::New();
-  extractIFilter->SetInputConnection(imageReader->GetOutputPort());
+  extractIFilter->SetInputConnection(yiqFilter->GetOutputPort());
   extractIFilter->SetComponents(1);
   extractIFilter->Update();
  
-  vtkSmartPointer<vtkImageExtractComponents> extractBlueFilter =
+  vtkSmartPointer<vtkImageExtractComponents> extractQFilter =
     vtkSmartPointer<vtkImageExtractComponents>::New();
-  extractBlueFilter->SetInputConnection(imageReader->GetOutputPort());
-  extractBlueFilter->SetComponents(2);
-  extractBlueFilter->Update();
+  extractQFilter->SetInputConnection(yiqFilter->GetOutputPort());
+  extractQFilter->SetComponents(2);
+  extractQFilter->Update();
+  //-----------------------------------------------------------------------------
 
-  //---------------------Parts below make the image pyramid---------------------
-  // http://www.vtk.org/doc/nightly/html/classvtkImageMagnify.html
-  int inputImageHeight = 544;
-  int inputImageWidth = 960;
-
+  vtkSmartPointer<vtkImageExtractComponents> imageSource;
   int NumberOfPyramidLevels = 6;
-  imageStruct imagePyramid[NumberOfPyramidLevels];
-  vtkSmartPointer<vtkImageGaussianSmooth> gaussianSmoothFilter;
-  vtkSmartPointer<vtkImageResize> resize;
-  // imageType images[6];
-  // Used sips -g pixelWidth image.png to get the above values
+  imageStruct YPyramid[NumberOfPyramidLevels];
+  imageStruct IPyramid[NumberOfPyramidLevels];
+  imageStruct QPyramid[NumberOfPyramidLevels];
+  for (int j=0; j<3; j++){
+    switch (j){
+      case 0:
+        imageSource = extractYFilter;
+        break;
+      case 1:
+        imageSource = extractIFilter;
+        break;
+      case 2:
+        imageSource = extractQFilter;
+        break;
+    }
+    //---------------------Parts below make the image pyramid---------------------
+    // http://www.vtk.org/doc/nightly/html/classvtkImageMagnify.html
+    // Somehow get the image pixel height and width from the image reader. Search for functions
+    int inputImageHeight = 544;
+    int inputImageWidth = 960;
 
-  // int a = 0;
-  // a = imageReader->GetFileDimensionality();
-  // cout << a << "\n";
-  // cout << imageReader->GetNumberOfScalarComponents() << "\n";
-  imagePyramid[0].imagedata = imageReader->GetOutput();
+    imageStruct imagePyramid[NumberOfPyramidLevels];
+    vtkSmartPointer<vtkImageGaussianSmooth> gaussianSmoothFilter;
+    vtkSmartPointer<vtkImageResize> resize;
+    // imageType images[6];
+    // Used sips -g pixelWidth image.png to get the above values
 
-  if (!imagePyramid[0].imagedata) printf("0 is NULL!\n");
-  for (int i=1; i<NumberOfPyramidLevels; i++){
-  // Gaussian smoothing
-    // vtkSmartPointer<vtkImageGaussianSmooth> gaussianSmoothFilter = 
-    //   vtkSmartPointer<vtkImageGaussianSmooth>::New();
-    // gaussianSmoothFilter->SetInputConnection(imageReader->GetOutputPort());
-    // gaussianSmoothFilter->Update();
+    // int a = 0;
+    // a = imageReader->GetFileDimensionality();
+    // cout << a << "\n";
+    // cout << imageReader->GetNumberOfScalarComponents() << "\n";
+    imagePyramid[0].imagedata = imageSource->GetOutput();
 
-    gaussianSmoothFilter = 
-      vtkSmartPointer<vtkImageGaussianSmooth>::New();
-    // gaussianSmoothFilter->SetInputData(imagePyramid[i-1].imagedata);
-    gaussianSmoothFilter->SetInputData(imagePyramid[i-1].imagedata);
-    gaussianSmoothFilter->Update();
+    // if (!imagePyramid[0].imagedata) printf("0 is NULL!\n");
+    for (int i=1; i<NumberOfPyramidLevels; i++){
+    // Gaussian smoothing
+      // vtkSmartPointer<vtkImageGaussianSmooth> gaussianSmoothFilter = 
+      //   vtkSmartPointer<vtkImageGaussianSmooth>::New();
+      // gaussianSmoothFilter->SetInputConnection(imageReader->GetOutputPort());
+      // gaussianSmoothFilter->Update();
 
-    // Can set standard deviation of the gaussian filter using "SetStandardDeviation (double std)"
+      gaussianSmoothFilter = 
+        vtkSmartPointer<vtkImageGaussianSmooth>::New();
+      // gaussianSmoothFilter->SetInputData(imagePyramid[i-1].imagedata);
+      gaussianSmoothFilter->SetInputData(imagePyramid[i-1].imagedata);
+      gaussianSmoothFilter->Update();
 
-    resize = vtkSmartPointer<vtkImageResize>::New();
-  #if VTK_MAJOR_VERSION <= 5
-    resize->SetInput(gaussianSmoothFilter->GetOutput());
-  #else
-    resize->SetInputData(gaussianSmoothFilter->GetOutput());
-  #endif
-    resize->SetOutputDimensions(inputImageHeight/(2*i), inputImageWidth/(2*i), 1);
-    resize->Update();
-    imagePyramid[i].imagedata = resize->GetOutput();
-    //imagePyramid[i].imagedata = imagePyramid[0].imagedata;
-    if (!imagePyramid[i].imagedata) printf("%d is NULL!\n", i);
-  }
+      // Can set standard deviation of the gaussian filter using "SetStandardDeviation (double std)"
+
+      resize = vtkSmartPointer<vtkImageResize>::New();
+    #if VTK_MAJOR_VERSION <= 5
+      resize->SetInput(gaussianSmoothFilter->GetOutput());
+    #else
+      resize->SetInputData(gaussianSmoothFilter->GetOutput());
+    #endif
+      resize->SetOutputDimensions(inputImageHeight/(2*i), inputImageWidth/(2*i), 1);
+      resize->Update();
+      imagePyramid[i].imagedata = resize->GetOutput();
+      //imagePyramid[i].imagedata = imagePyramid[0].imagedata;
+      // if (!imagePyramid[i].imagedata) printf("%d is NULL!\n", i);
+    }
   //---------------------------------------------------------------------------------
-
+    switch (j){
+      case 0:
+      for (int k=1; k<NumberOfPyramidLevels; k++){
+        YPyramid[k].imagedata = imagePyramid[k].imagedata;
+      }
+        break;
+      case 1:
+        IPyramid = imagePyramid;
+        break;
+      case 2:
+        QPyramid = imagePyramid;
+        break;
+    }
+  }
   // Now imagePyramid[i].imagedata stores vtkImageData*. Level 0 has the image and as we go higher up we have the smoothed and downsampled image.
   // For example, 
  
