@@ -14,17 +14,18 @@
 int main(int argc, char *argv[])
 {
   // Verify command line arguments
-  if(argc != 2)
-    {
-    std::cerr << "Required arguments: image" << std::endl;
-    return EXIT_FAILURE;
-    }
+  // if(argc != 2)
+  //   {
+  //   std::cerr << "Required arguments: image" << std::endl;
+  //   return EXIT_FAILURE;
+  //   }
  
-  std::string inputFilename = argv[1];
+  // std::string inputFilename = argv[1];
  
-  std::cout << "Reading file: " << inputFilename << std::endl;
+  // std::cout << "Reading file: " << inputFilename << std::endl;
  
-  // Read JPG file
+  std::string inputFilename = "image.png";
+
   vtkSmartPointer<vtkPNGReader> reader =
     vtkSmartPointer<vtkPNGReader>::New();
   reader->SetFileName(inputFilename.c_str());
@@ -37,19 +38,19 @@ int main(int argc, char *argv[])
  
   vtkSmartPointer<vtkImageExtractComponents> extractHueFilter =
     vtkSmartPointer<vtkImageExtractComponents>::New();
-  extractHueFilter->SetInputConnection(reader->GetOutputPort());
+  extractHueFilter->SetInputConnection(hsvFilter->GetOutputPort());
   extractHueFilter->SetComponents(0);
   extractHueFilter->Update();
  
   vtkSmartPointer<vtkImageExtractComponents> extractSaturationFilter =
     vtkSmartPointer<vtkImageExtractComponents>::New();
-  extractSaturationFilter->SetInputConnection(reader->GetOutputPort());
+  extractSaturationFilter->SetInputConnection(hsvFilter->GetOutputPort());
   extractSaturationFilter->SetComponents(1);
   extractSaturationFilter->Update();
  
   vtkSmartPointer<vtkImageExtractComponents> extractValueFilter =
     vtkSmartPointer<vtkImageExtractComponents>::New();
-  extractValueFilter->SetInputConnection(reader->GetOutputPort());
+  extractValueFilter->SetInputConnection(hsvFilter->GetOutputPort());
   extractValueFilter->SetComponents(2);
   extractValueFilter->Update();
  
