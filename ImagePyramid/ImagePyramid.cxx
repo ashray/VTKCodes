@@ -19,9 +19,19 @@
 #include <vtkInteractorStyleImage.h>
 #include <vtkRenderer.h>
 #include <vtkImageActor.h>
+
+#include <vtkImageResize.h>
+#include "vtkImageSincInterpolator.h"
+
+// typedef int* imageType;
+
+struct imageStruct {
+vtkImageData * imagedata;
+};
  
 int main(int argc, char* argv[])
 {
+
   // Verify input arguments
   // if(argc != 2)
   //   {
@@ -39,20 +49,47 @@ int main(int argc, char* argv[])
   imageReader->SetFileName(inputFilename.c_str());
   imageReader->Update();
 
+  // Somehow get the image pixel height and width from the above image reader. Search for functions
 
+  // http://www.vtk.org/doc/nightly/html/classvtkImageMagnify.html
+  int inputImageHeight = 544;
+  int inputImageWidth = 960;
 
+  int NumberOfPyramidLevels = 6;
+  imageStruct imagePyramid[NumberOfPyramidLevels];
+  // imageType images[6];
+  // Used sips -g pixelWidth image.png to get the above values
+
+  // int a = 0;
+  // a = imageReader->GetFileDimensionality();
+  // cout << a << "\n";
+  // cout << imageReader->GetNumberOfScalarComponents() << "\n";
+  for (int i=0; i<NumberOfPyramidLevels; i++){
   // Gaussian smoothing
-  vtkSmartPointer<vtkImageGaussianSmooth> gaussianSmoothFilter = 
-    vtkSmartPointer<vtkImageGaussianSmooth>::New();
-  gaussianSmoothFilter->SetInputConnection(imageReader->GetOutputPort());
-  gaussianSmoothFilter->Update();
+    vtkSmartPointer<vtkImageGaussianSmooth> gaussianSmoothFilter = 
+      vtkSmartPointer<vtkImageGaussianSmooth>::New();
+    gaussianSmoothFilter->SetInputConnection(imageReader->GetOutputPort());
+    gaussianSmoothFilter->Update();
 
-  // Can set standard deviation of the gaussian filter using "SetStandardDeviation (double std)"
+    // Can set standard deviation of the gaussian filter using "SetStandardDeviation (double std)"
+
+    vtkSmartPointer<vtkImageResize> resize =
+      vtkSmartPointer<vtkImageResize>::New();
+  #if VTK_MAJOR_VERSION <= 5
+    resize->SetInput(gaussianSmoothFilter->GetOutput());
+  #else
+    resize->SetInputData(gaussianSmoothFilter->GetOutput());
+  #endif
+    resize->SetOutputDimensions(inputImageHeight/8, inputImageWidth/8, 1);
+    resize->Update();
+    imagePyramid[i].imagedata = resize->GetOutput();
+  }
  
   // Visualize
   vtkSmartPointer<vtkDataSetMapper> mapper =
     vtkSmartPointer<vtkDataSetMapper>::New();
-  mapper->SetInputConnection(gaussianSmoothFilter->GetOutputPort());
+  // mapper->SetInputConnection(resize->GetOutputPort());
+  mapper->SetInputData((vtkDataSet *)imagePyramid[0].imagedata);
  
   vtkSmartPointer<vtkActor> actor =
     vtkSmartPointer<vtkActor>::New();
@@ -78,3 +115,4 @@ int main(int argc, char* argv[])
  
   return EXIT_SUCCESS;
 }
+
