@@ -142,19 +142,33 @@ int main(int argc, char* argv[])
       //imagePyramid[i].imagedata = imagePyramid[0].imagedata;
       // if (!imagePyramid[i].imagedata) printf("%d is NULL!\n", i);
     }
-  //---------------------------------------------------------------------------------
+    
+    //---------------------------------------------------------------------------------
     switch (j){
       case 0:
-      for (int k=1; k<NumberOfPyramidLevels; k++){
-        YPyramid[k].imagedata = imagePyramid[k].imagedata;
+      {
+        for (int k=1; k<NumberOfPyramidLevels; k++)
+        {
+          YPyramid[k].imagedata = imagePyramid[k].imagedata;
+        }
+        break;
       }
-        break;
       case 1:
-        IPyramid = imagePyramid;
+      {
+        for (int k=1; k<NumberOfPyramidLevels; k++)
+        {
+          IPyramid[k].imagedata = imagePyramid[k].imagedata;
+        }
         break;
+      }
       case 2:
-        QPyramid = imagePyramid;
+      {
+        for (int k=1; k<NumberOfPyramidLevels; k++)
+        {
+          QPyramid[k].imagedata = imagePyramid[k].imagedata;
+        }
         break;
+      }
     }
   }
   // Now imagePyramid[i].imagedata stores vtkImageData*. Level 0 has the image and as we go higher up we have the smoothed and downsampled image.
@@ -164,9 +178,13 @@ int main(int argc, char* argv[])
   vtkSmartPointer<vtkDataSetMapper> mapper =
     vtkSmartPointer<vtkDataSetMapper>::New();
   // mapper->SetInputConnection(resize->GetOutputPort());
-  mapper->SetInputData(/*(vtkDataSet *)*/imagePyramid[3].imagedata);
+
+  //-------------------Suspected code snippet causing segmentation error----------------------------  
+  // Why does mapper->SetInputData(imagePyramid[0].imagedata);  throw up an error?
+  mapper->SetInputData(YPyramid[0].imagedata);
   // mapper->SetInputData(resize->GetOutput());
- 
+ //--------------------------------------------------------------------------------------------------
+
   vtkSmartPointer<vtkActor> actor =
     vtkSmartPointer<vtkActor>::New();
   actor->SetMapper(mapper);
