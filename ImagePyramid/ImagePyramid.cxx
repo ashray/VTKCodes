@@ -33,7 +33,11 @@
 #include "vtkStringArray.h"
 
 #include <vtkImageShiftScale.h>
+#include <vtkImageDifference.h>
+#include <vtkImageMathematics.h>
 
+
+// Originally defined as struct but with a struct the variables go out of scope and hence get deleted.
 class imageStruct
 {
   public:
@@ -50,6 +54,13 @@ int main(int argc, char* argv[])
   imageStruct *YPyramid = new imageStruct[NumberOfPyramidLevels];
   imageStruct *IPyramid = new imageStruct[NumberOfPyramidLevels];
   imageStruct *QPyramid = new imageStruct[NumberOfPyramidLevels];
+
+  imageStruct *YPyramidPreviousFrame = new imageStruct[NumberOfPyramidLevels];
+  imageStruct *IPyramidPreviousFrame = new imageStruct[NumberOfPyramidLevels];
+  imageStruct *QPyramidPreviousFrame = new imageStruct[NumberOfPyramidLevels];
+  imageStruct *YDifference = new imageStruct[NumberOfPyramidLevels];
+  imageStruct *IDifference = new imageStruct[NumberOfPyramidLevels];
+  imageStruct *QDifference = new imageStruct[NumberOfPyramidLevels];
 
   // Verify input arguments
   // if(argc != 2)
@@ -80,8 +91,8 @@ int main(int argc, char* argv[])
   // cout << (glob->GetNthFileName(1));
 
 
-  // for (int ImageNumber = 0; ImageNumber < frameCount; ImageNumber++){
-  for (int ImageNumber = 0; ImageNumber < 1; ImageNumber++){
+  for (int ImageNumber = 0; ImageNumber < frameCount; ImageNumber++){
+  // for (int ImageNumber = 0; ImageNumber < 1; ImageNumber++){
     std::string inputFilename = glob->GetNthFileName(ImageNumber);
     cout << inputFilename << "\n";
 
@@ -122,12 +133,6 @@ int main(int argc, char* argv[])
 
     vtkSmartPointer<vtkImageExtractComponents> imageSource;
     int NumberOfPyramidLevels = 6;
-    imageStruct *YPyramidPreviousFrame = new imageStruct[NumberOfPyramidLevels];
-    imageStruct *IPyramidPreviousFrame = new imageStruct[NumberOfPyramidLevels];
-    imageStruct *QPyramidPreviousFrame = new imageStruct[NumberOfPyramidLevels];
-    imageStruct *YDifference = new imageStruct[NumberOfPyramidLevels];
-    imageStruct *IDifference = new imageStruct[NumberOfPyramidLevels];
-    imageStruct *QDifference = new imageStruct[NumberOfPyramidLevels];
     for (int j=0; j<3; j++){
       switch (j){
         case 0:
@@ -185,39 +190,7 @@ int main(int argc, char* argv[])
         imagePyramid[i].imagedata->ShallowCopy(resize->GetOutput());
       }
 
-      // Initialising the Previous frame pyramid for frame 1. We initialise it to the first frame(which means first value of frame difference is going to be zero)
-      // if (ImageNumber==1)
-      // {
-      //   switch (j){
-      //   case 0:
-      //   {
-      //     //Make the code below in a seperate function to copy image pyramids
-      //     for (int k=1; k<NumberOfPyramidLevels; k++)
-      //     {
-      //       YPyramidPreviousFrame[k].imagedata->ShallowCopy(YPyramid[k].imagedata);
-      //     }
-      //     break;
-      //   }
-      //   case 1:
-      //   {
-      //     for (int k=1; k<NumberOfPyramidLevels; k++)
-      //     {
-      //       IPyramidPreviousFrame[k].imagedata->ShallowCopy(IPyramid[k].imagedata);
-      //     }
-      //     break;
-      //   }
-      //   case 2:
-      //   {
-      //     for (int k=1; k<NumberOfPyramidLevels; k++)
-      //     {
-      //       QPyramidPreviousFrame[k].imagedata->ShallowCopy(QPyramid[k].imagedata);
-      //     }
-      //     break;
-      //   }
-      // }
-      // }
-
-      //---------------------------------------------------------------------------------
+      //-------------Copy Image Pyramid for frame numbers greater than 1-------
       switch (j){
         case 0:
           {
@@ -245,51 +218,188 @@ int main(int argc, char* argv[])
             break;
           }
       }
+      //--------------------------------------------------------------------
+
+
+      //-------------Copy Image Pyramid-----------------------------------
+      // Initialising the Previous frame pyramid for frame 1. We initialise it to the first frame(which means first value of frame difference is going to be zero)
+      if (ImageNumber==1)
+      {
+        switch (j)
+        {
+          case 0:
+          {
+            //Make the code below in a seperate function to copy image pyramids
+            for (int k=0; k<NumberOfPyramidLevels; k++)
+            {
+              YPyramidPreviousFrame[k].imagedata->ShallowCopy(YPyramid[k].imagedata);
+            }
+            break;
+          }
+          case 1:
+          {
+            for (int k=0; k<NumberOfPyramidLevels; k++)
+            {
+              IPyramidPreviousFrame[k].imagedata->ShallowCopy(IPyramid[k].imagedata);
+            }
+            break;
+          }
+          case 2:
+          {
+            for (int k=0; k<NumberOfPyramidLevels; k++)
+            {
+              QPyramidPreviousFrame[k].imagedata->ShallowCopy(QPyramid[k].imagedata);
+            }
+            break;
+          }
+        }
+      }
+      //--------------------------------------------------------------------
+    
+
+      //---------------Calculate difference of Image Pyramids----------------------------
+      vtkSmartPointer<vtkImageDifference> differenceFilter = vtkSmartPointer<vtkImageDifference>::New();
+      differenceFilter->AllowShiftOff();
+      differenceFilter->AveragingOff();
+      differenceFilter->SetAllowShift(0);
+      differenceFilter->SetThreshold(0);
+      vtkSmartPointer<vtkImageMathematics> imageMath = 
+        vtkSmartPointer<vtkImageMathematics>::New();
+      imageMath->SetOperationToSubtract();
+      switch(j)
+      {
+        case 0:
+        {
+          for (int k=0; k<NumberOfPyramidLevels; k++)
+          {
+            // differenceFilter->SetInputData(QPyramidPreviousFrame[k].imagedata);
+            // differenceFilter->SetImageData(QPyramid[k].imagedata);
+            // differenceFilter->SetImageData(QPyramid[k].imagedata);
+            // differenceFilter->Update();
+            // YDifference[k].imagedata->ShallowCopy(differenceFilter->GetOutput());
+            
+            imageMath->SetInput1Data(YPyramidPreviousFrame[k].imagedata);
+            imageMath->SetInput2Data(YPyramid[k].imagedata);
+            imageMath->Update();
+            YDifference[k].imagedata->ShallowCopy(imageMath->GetOutput());
+          }
+          break;          
+        }
+        case 1:
+        {
+          for (int k=0; k<NumberOfPyramidLevels; k++)
+          {          
+            imageMath->SetInput1Data(IPyramidPreviousFrame[k].imagedata);
+            imageMath->SetInput2Data(IPyramid[k].imagedata);
+            imageMath->Update();
+            IDifference[k].imagedata->ShallowCopy(imageMath->GetOutput());
+          }
+          break;          
+        }
+        case 2:
+        {
+          for (int k=0; k<NumberOfPyramidLevels; k++)
+          {
+            imageMath->SetInput1Data(QPyramidPreviousFrame[k].imagedata);
+            imageMath->SetInput2Data(QPyramid[k].imagedata);
+            imageMath->Update();
+            QDifference[k].imagedata->ShallowCopy(imageMath->GetOutput());
+          }
+          break;
+        }        
+      }
+
+      //---------------------------------------------------------------------------------
+
 
       //Writing this again so that it is easier later to seperate into different functions
-      // switch (j){
-      //   case 0:
-      //   {
-      //     //Make the code below in a seperate function to copy image pyramids
-      //     for (int k=1; k<NumberOfPyramidLevels; k++)
-      //     {
-      //       // YDifference[k].imagedata->ShallowCopy(Difference ( YPyramid[k].imagedata - YPyramidPreviousFrame[k].imagedata ));
-      //       YPyramidPreviousFrame[k].imagedata->ShallowCopy(YPyramid[k].imagedata);
-      //     }
-      //     break;
+      switch (j)
+      {
+        case 0:
+        {
+          //Make the code below in a seperate function to copy image pyramids
+          for (int k=0; k<NumberOfPyramidLevels; k++)
+          {
+            // YDifference[k].imagedata->ShallowCopy(Difference ( YPyramid[k].imagedata - YPyramidPreviousFrame[k].imagedata ));
+            YPyramidPreviousFrame[k].imagedata->ShallowCopy(YPyramid[k].imagedata);
+          }
+          break;
+        }
+        case 1:
+        {
+          for (int k=0; k<NumberOfPyramidLevels; k++)
+          {
+            IPyramidPreviousFrame[k].imagedata->ShallowCopy(imagePyramid[k].imagedata);
+          }
+          break;
+        }
+        case 2:
+        {
+          for (int k=0; k<NumberOfPyramidLevels; k++)
+          {
+            QPyramidPreviousFrame[k].imagedata->ShallowCopy(imagePyramid[k].imagedata);
+          }
+          break;
+        }
+      }
 
-      //   }
-      //   case 1:
-      //   {
-      //     for (int k=1; k<NumberOfPyramidLevels; k++)
-      //     {
-      //       IPyramid[k].imagedata->ShallowCopy(imagePyramid[k].imagedata);
-      //     }
-      //     break;
-      //   }
-      //   case 2:
-      //   {
-      //     for (int k=1; k<NumberOfPyramidLevels; k++)
-      //     {
-      //       QPyramid[k].imagedata->ShallowCopy(imagePyramid[k].imagedata);
-      //     }
-      //     break;
-      //   }
-      // }
+      //----------Chromatic Abberation to reduce noise---------------
+      double chromatic_abberation = 0.1; //User given input
+      vtkSmartPointer<vtkImageMathematics> chromaticCorrection = 
+        vtkSmartPointer<vtkImageMathematics>::New();
+      chromaticCorrection->SetOperationToMultiplyByK();
+      chromaticCorrection->SetConstantK(chromatic_abberation);
+      switch(j)
+      {
+        //Do nothing for Y channel
+        case 1:
+        {
+          for (int k=0; k<NumberOfPyramidLevels; k++)
+          {
+            chromaticCorrection->SetInput1Data(IDifference[k].imagedata);
+            chromaticCorrection->Update();
+            IDifference[k].imagedata->ShallowCopy(chromaticCorrection->GetOutput());
+          }
+          break;
+        }
+        case 2:
+        {
+          for (int k=0; k<NumberOfPyramidLevels; k++)
+          {
+            chromaticCorrection->SetInput1Data(QDifference[k].imagedata);
+            chromaticCorrection->Update();
+            QDifference[k].imagedata->ShallowCopy(chromaticCorrection->GetOutput());
+          }
+          break;
+        }
+      }
 
-    }
-  }
+    } //End of iteration over image Pyramids
+  } //End of iteration over 
   // Now imagePyramid[i].imagedata stores vtkImageData*. Level 0 has the image and as we go higher up we have the smoothed and downsampled image.
   // For example, 
 
-  // Visualize
+//   std::string iterationNumberString = std::to_string(i);
+//   std::string outputFileName = "OutputFrame" + iterationNumberString+".png";
+//   vtkSmartPointer<vtkPNGWriter> writeDifferenceFrames = vtkSmartPointer<vtkPNGWriter>::New();
+//   writeDifferenceFrames->SetFileName(outputFileName.c_str());
+//   writeDifferenceFrames->SetInputConnection(scaleDifference->GetOutputPort());
+//   writeDifferenceFrames->Write(); 
+// // Visualize
+ 
+
+
+
   vtkSmartPointer<vtkDataSetMapper> mapper =
     vtkSmartPointer<vtkDataSetMapper>::New();
+
+
   // mapper->SetInputConnection(resize->GetOutputPort());
 
   //-------------------Suspected code snippet causing segmentation error----------------------------  
   // Why does mapper->SetInputData(imagePyramid[0].imagedata);  throw up an error?
-  mapper->SetInputData(QPyramid[4].imagedata);
+  mapper->SetInputData(YDifference[5].imagedata);
+    // mapper->SetInputData(differenceFilter->GetOutput);
   // mapper->SetInputData(resize->GetOutput());
   //--------------------------------------------------------------------------------------------------
 
