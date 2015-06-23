@@ -35,6 +35,8 @@
 #include <vtkImageShiftScale.h>
 #include <vtkImageDifference.h>
 #include <vtkImageMathematics.h>
+#include <vtkImageWeightedSum.h>
+
 
 
 // Originally defined as struct but with a struct the variables go out of scope and hence get deleted.
@@ -343,6 +345,96 @@ int main(int argc, char* argv[])
         }
       }
 
+      //-----------Collapse the image Pyramid------------------------
+
+//       vtkSmartPointer<vtkImageGaussianSmooth> gaussianSmoothFilter;
+//       vtkSmartPointer<vtkImageResize> resize;
+//       imagePyramid[0].imagedata->ShallowCopy(imageSource->GetOutput());
+
+//       for (int i=1; i<NumberOfPyramidLevels; i++){
+//         gaussianSmoothFilter = 
+//           vtkSmartPointer<vtkImageGaussianSmooth>::New();
+//         gaussianSmoothFilter->SetInputData(imagePyramid[i-1].imagedata);
+//         gaussianSmoothFilter->Update();
+
+//         resize = vtkSmartPointer<vtkImageResize>::New();
+//         resize->SetResizeMethodToOutputDimensions();
+// #if VTK_MAJOR_VERSION <= 5
+//         resize->SetInput(gaussianSmoothFilter->GetOutput());
+// #else
+//         resize->SetInputData(gaussianSmoothFilter->GetOutput());
+// #endif
+//         resize->SetOutputDimensions(inputImageHeight/(2*i), inputImageWidth/(2*i), 1);
+//         resize->Update();
+//         imagePyramid[i].imagedata->ShallowCopy(resize->GetOutput());
+//       }
+
+      //How to collapse an image Pyramid??
+  // def collapse(lapl_pyr):
+  // output = None
+  // output = np.zeros((lapl_pyr[0].shape[0],lapl_pyr[0].shape[1]), dtype=np.float64)
+  // for i in range(len(lapl_pyr)-1,0,-1):
+  //   lap = iexpand(lapl_pyr[i])
+  //   lapb = lapl_pyr[i-1]
+  //   if lap.shape[0] > lapb.shape[0]:
+  //     lap = np.delete(lap,(-1),axis=0)
+  //   if lap.shape[1] > lapb.shape[1]:
+  //     lap = np.delete(lap,(-1),axis=1)
+  //   tmp = lap + lapb
+  //   lapl_pyr.pop()
+  //   lapl_pyr.pop()
+  //   lapl_pyr.append(tmp)
+  //   output = tmp
+  // return output
+
+      // Verify that the algorithm to implement the laplacian pyramid is correct
+      resize = vtkSmartPointer<vtkImageResize>::New();
+      gaussianSmoothFilter = vtkSmartPointer<vtkImageGaussianSmooth>::New();
+      vtkSmartPointer<vtkImageWeightedSum> sumFilter = vtkSmartPointer<vtkImageWeightedSum>::New();
+      sumFilter->SetWeight(0,0.5);
+      sumFilter->SetWeight(1,0.5);
+      resize->SetResizeMethodToOutputDimensions();
+    //   switch (j)
+    //   {
+    //     case 0:
+    //     {
+    //       for (int g = (NumberOfPyramidLevels-2); g>=1; g--)
+    //       {
+    //         // vtkSmartPointer<vtkImageWeightedSum> sumFilter = vtkSmartPointer<vtkImageWeightedSum>::New();
+    //         // sumFilter->SetWeight(0,0.5);
+    //         // sumFilter->SetWeight(1,0.5);
+    //         if (g == (NumberOfPyramidLevels-1))
+    //         {
+    // #if VTK_MAJOR_VERSION <= 5
+    //           resize->SetInput(YDifference[g].imagedata);
+    // #else
+    //           resize->SetInputData(YDifference[g].imagedata);
+    // #endif          
+    //         }
+
+    //         else
+    //         {
+    // #if VTK_MAJOR_VERSION <= 5
+    //           resize->SetInput(sumFilter->GetOutput());
+    // #else
+    //           resize->SetInputData(sumFilter->GetOutput());
+    // #endif
+    //         }
+    //         resize->SetOutputDimensions(inputImageHeight/(2*(g-1)), inputImageWidth/(2*(g-1)),1);
+    //         resize->Update();
+    //         gaussianSmoothFilter->SetInputData(resize->GetOutput());
+    //         gaussianSmoothFilter->Update();
+    //         sumFilter->AddInputConnection(gaussianSmoothFilter->GetOutputPort());
+    //         // sumFilter->SetInputData(YDifference[g-1].imagedata);
+    //         sumFilter->AddInputConnection(gaussianSmoothFilter->GetOutputPort());
+    //         sumFilter->Update();
+    //       }
+    //       break;
+    //     }
+    //   }
+      //------------------------------------------
+
+
       //----------Chromatic Abberation to reduce noise---------------
       double chromatic_abberation = 0.1; //User given input
       vtkSmartPointer<vtkImageMathematics> chromaticCorrection = 
@@ -398,7 +490,7 @@ int main(int argc, char* argv[])
 
   //-------------------Suspected code snippet causing segmentation error----------------------------  
   // Why does mapper->SetInputData(imagePyramid[0].imagedata);  throw up an error?
-  mapper->SetInputData(YDifference[5].imagedata);
+  mapper->SetInputData(YDifference[0].imagedata);
     // mapper->SetInputData(differenceFilter->GetOutput);
   // mapper->SetInputData(resize->GetOutput());
   //--------------------------------------------------------------------------------------------------
