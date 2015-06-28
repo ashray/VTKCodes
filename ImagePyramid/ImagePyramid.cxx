@@ -29,7 +29,8 @@
 #include <vtkGlobFileNames.h>
 #include <vtksys/SystemTools.hxx>
 #include <string>
-#include <stdio.h>
+#include <cstdio>
+#include <cmath>
 #include "vtkStringArray.h"
 
 #include <vtkImageShiftScale.h>
@@ -50,7 +51,7 @@ class imageStruct
 
 int main(int argc, char* argv[])
 {
-  //Have to define these variables as global since used in mapper   
+  //Have to define these variables as global since used in mapper
   int NumberOfPyramidLevels = 6;
   imageStruct *imagePyramid = new imageStruct[NumberOfPyramidLevels];
   imageStruct *YPyramid = new imageStruct[NumberOfPyramidLevels];
@@ -94,7 +95,6 @@ int main(int argc, char* argv[])
 
 
   for (int ImageNumber = 0; ImageNumber < frameCount; ImageNumber++){
-  // for (int ImageNumber = 0; ImageNumber < 1; ImageNumber++){
     std::string inputFilename = glob->GetNthFileName(ImageNumber);
     cout << inputFilename << "\n";
 
@@ -150,8 +150,9 @@ int main(int argc, char* argv[])
       //---------------------Parts below make the image pyramid---------------------
       // http://www.vtk.org/doc/nightly/html/classvtkImageMagnify.html
       // Somehow get the image pixel height and width from the image reader. Search for functions
-      int inputImageHeight = 544;
-      int inputImageWidth = 960;
+      int* a = imageReader->GetOutput()->GetExtent();
+      int imageDimension1 = a[1] - a[0] + 1;
+      int imageDimension2 = a[3] - a[2] + 1;
 
       vtkSmartPointer<vtkImageGaussianSmooth> gaussianSmoothFilter;
       vtkSmartPointer<vtkImageResize> resize;
@@ -167,12 +168,12 @@ int main(int argc, char* argv[])
       // if (!imagePyramid[0].imagedata) printf("0 is NULL!\n");
       for (int i=1; i<NumberOfPyramidLevels; i++){
         // Gaussian smoothing
-        // vtkSmartPointer<vtkImageGaussianSmooth> gaussianSmoothFilter = 
+        // vtkSmartPointer<vtkImageGaussianSmooth> gaussianSmoothFilter =
         //   vtkSmartPointer<vtkImageGaussianSmooth>::New();
         // gaussianSmoothFilter->SetInputConnection(imageReader->GetOutputPort());
         // gaussianSmoothFilter->Update();
 
-        gaussianSmoothFilter = 
+        gaussianSmoothFilter =
           vtkSmartPointer<vtkImageGaussianSmooth>::New();
         // gaussianSmoothFilter->SetInputData(imagePyramid[i-1].imagedata);
         gaussianSmoothFilter->SetInputData(imagePyramid[i-1].imagedata);
@@ -187,7 +188,7 @@ int main(int argc, char* argv[])
 #else
         resize->SetInputData(gaussianSmoothFilter->GetOutput());
 #endif
-        resize->SetOutputDimensions(inputImageHeight/(2*i), inputImageWidth/(2*i), 1);
+        resize->SetOutputDimensions(imageDimension1/(pow(2,i)), imageDimension2/(pow(2,i)), 1);
         resize->Update();
         imagePyramid[i].imagedata->ShallowCopy(resize->GetOutput());
       }
@@ -225,7 +226,7 @@ int main(int argc, char* argv[])
 
       //-------------Copy Image Pyramid-----------------------------------
       // Initialising the Previous frame pyramid for frame 1. We initialise it to the first frame(which means first value of frame difference is going to be zero)
-      if (ImageNumber==1)
+      if (!ImageNumber)
       {
         switch (j)
         {
@@ -257,7 +258,7 @@ int main(int argc, char* argv[])
         }
       }
       //--------------------------------------------------------------------
-    
+
 
       //---------------Calculate difference of Image Pyramids----------------------------
       vtkSmartPointer<vtkImageDifference> differenceFilter = vtkSmartPointer<vtkImageDifference>::New();
@@ -265,7 +266,7 @@ int main(int argc, char* argv[])
       differenceFilter->AveragingOff();
       differenceFilter->SetAllowShift(0);
       differenceFilter->SetThreshold(0);
-      vtkSmartPointer<vtkImageMathematics> imageMath = 
+      vtkSmartPointer<vtkImageMathematics> imageMath =
         vtkSmartPointer<vtkImageMathematics>::New();
       imageMath->SetOperationToSubtract();
       switch(j)
@@ -279,24 +280,24 @@ int main(int argc, char* argv[])
             // differenceFilter->SetImageData(QPyramid[k].imagedata);
             // differenceFilter->Update();
             // YDifference[k].imagedata->ShallowCopy(differenceFilter->GetOutput());
-            
+
             imageMath->SetInput1Data(YPyramidPreviousFrame[k].imagedata);
             imageMath->SetInput2Data(YPyramid[k].imagedata);
             imageMath->Update();
             YDifference[k].imagedata->ShallowCopy(imageMath->GetOutput());
           }
-          break;          
+          break;
         }
         case 1:
         {
           for (int k=0; k<NumberOfPyramidLevels; k++)
-          {          
+          {
             imageMath->SetInput1Data(IPyramidPreviousFrame[k].imagedata);
             imageMath->SetInput2Data(IPyramid[k].imagedata);
             imageMath->Update();
             IDifference[k].imagedata->ShallowCopy(imageMath->GetOutput());
           }
-          break;          
+          break;
         }
         case 2:
         {
@@ -308,7 +309,7 @@ int main(int argc, char* argv[])
             QDifference[k].imagedata->ShallowCopy(imageMath->GetOutput());
           }
           break;
-        }        
+        }
       }
 
       //---------------------------------------------------------------------------------
@@ -347,27 +348,27 @@ int main(int argc, char* argv[])
 
       //-----------Collapse the image Pyramid------------------------
 
-//       vtkSmartPointer<vtkImageGaussianSmooth> gaussianSmoothFilter;
-//       vtkSmartPointer<vtkImageResize> resize;
-//       imagePyramid[0].imagedata->ShallowCopy(imageSource->GetOutput());
+      //vtkSmartPointer<vtkImageGaussianSmooth> gaussianSmoothFilter;
+      //vtkSmartPointer<vtkImageResize> resize;
+      imagePyramid[0].imagedata->ShallowCopy(imageSource->GetOutput());
 
-//       for (int i=1; i<NumberOfPyramidLevels; i++){
-//         gaussianSmoothFilter = 
-//           vtkSmartPointer<vtkImageGaussianSmooth>::New();
-//         gaussianSmoothFilter->SetInputData(imagePyramid[i-1].imagedata);
-//         gaussianSmoothFilter->Update();
+      for (int i=1; i<NumberOfPyramidLevels; i++){
+        gaussianSmoothFilter =
+          vtkSmartPointer<vtkImageGaussianSmooth>::New();
+        gaussianSmoothFilter->SetInputData(imagePyramid[i-1].imagedata);
+        gaussianSmoothFilter->Update();
 
-//         resize = vtkSmartPointer<vtkImageResize>::New();
-//         resize->SetResizeMethodToOutputDimensions();
-// #if VTK_MAJOR_VERSION <= 5
-//         resize->SetInput(gaussianSmoothFilter->GetOutput());
-// #else
-//         resize->SetInputData(gaussianSmoothFilter->GetOutput());
-// #endif
-//         resize->SetOutputDimensions(inputImageHeight/(2*i), inputImageWidth/(2*i), 1);
-//         resize->Update();
-//         imagePyramid[i].imagedata->ShallowCopy(resize->GetOutput());
-//       }
+        resize = vtkSmartPointer<vtkImageResize>::New();
+        resize->SetResizeMethodToOutputDimensions();
+#if VTK_MAJOR_VERSION <= 5
+        resize->SetInput(gaussianSmoothFilter->GetOutput());
+#else
+        resize->SetInputData(gaussianSmoothFilter->GetOutput());
+#endif
+        resize->SetOutputDimensions(imageDimension1/(2i), imageDimension2/(2*i), 1);
+        resize->Update();
+        imagePyramid[i].imagedata->ShallowCopy(resize->GetOutput());
+      }
 
       //How to collapse an image Pyramid??
   // def collapse(lapl_pyr):
@@ -394,50 +395,56 @@ int main(int argc, char* argv[])
       sumFilter->SetWeight(0,0.5);
       sumFilter->SetWeight(1,0.5);
       resize->SetResizeMethodToOutputDimensions();
-    //   switch (j)
-    //   {
-    //     case 0:
-    //     {
-    //       for (int g = (NumberOfPyramidLevels-2); g>=1; g--)
-    //       {
-    //         // vtkSmartPointer<vtkImageWeightedSum> sumFilter = vtkSmartPointer<vtkImageWeightedSum>::New();
-    //         // sumFilter->SetWeight(0,0.5);
-    //         // sumFilter->SetWeight(1,0.5);
-    //         if (g == (NumberOfPyramidLevels-1))
-    //         {
-    // #if VTK_MAJOR_VERSION <= 5
-    //           resize->SetInput(YDifference[g].imagedata);
-    // #else
-    //           resize->SetInputData(YDifference[g].imagedata);
-    // #endif          
-    //         }
+      // switch (j)
+      // {
+      //   case 0:
+      //   {
+      for (int g = (NumberOfPyramidLevels-1); g>=1; g--)
+      {
+        // vtkSmartPointer<vtkImageWeightedSum> sumFilter = vtkSmartPointer<vtkImageWeightedSum>::New();
+        // sumFilter->SetWeight(0,0.5);
+        // sumFilter->SetWeight(1,0.5);
+        if (g == (NumberOfPyramidLevels-1))
+        {
+#if VTK_MAJOR_VERSION <= 5
+          resize->SetInput(YDifference[g].imagedata);
+#else
+          resize->SetInputData(YDifference[g].imagedata);
+#endif
+        }
 
-    //         else
-    //         {
-    // #if VTK_MAJOR_VERSION <= 5
-    //           resize->SetInput(sumFilter->GetOutput());
-    // #else
-    //           resize->SetInputData(sumFilter->GetOutput());
-    // #endif
-    //         }
-    //         resize->SetOutputDimensions(inputImageHeight/(2*(g-1)), inputImageWidth/(2*(g-1)),1);
-    //         resize->Update();
-    //         gaussianSmoothFilter->SetInputData(resize->GetOutput());
-    //         gaussianSmoothFilter->Update();
-    //         sumFilter->AddInputConnection(gaussianSmoothFilter->GetOutputPort());
-    //         // sumFilter->SetInputData(YDifference[g-1].imagedata);
-    //         sumFilter->AddInputConnection(gaussianSmoothFilter->GetOutputPort());
-    //         sumFilter->Update();
-    //       }
-    //       break;
-    //     }
-    //   }
+        else
+        {
+#if VTK_MAJOR_VERSION <= 5
+          resize->SetInput(sumFilter->GetOutput());
+#else
+          resize->SetInputData(sumFilter->GetOutput());
+#endif
+        }
+
+        sumFilter = NULL;
+        sumFilter = vtkSmartPointer<vtkImageWeightedSum>::New();
+        sumFilter->SetWeight(0,0.5);
+        sumFilter->SetWeight(1,0.5);
+
+        resize->SetOutputDimensions(imageDimension1/pow(2,(g-1)), imageDimension2/pow(2,(g-1)), -1);
+        resize->Update();
+
+        gaussianSmoothFilter->SetInputData(resize->GetOutput());
+        gaussianSmoothFilter->Update();
+        sumFilter->SetInputData(gaussianSmoothFilter->GetOutput());
+        sumFilter->AddInputData(YDifference[g-1].imagedata);
+        sumFilter->Update();
+      }
+      //     break;
+      //   }
+      // }
       //------------------------------------------
 
 
       //----------Chromatic Abberation to reduce noise---------------
       double chromatic_abberation = 0.1; //User given input
-      vtkSmartPointer<vtkImageMathematics> chromaticCorrection = 
+      vtkSmartPointer<vtkImageMathematics> chromaticCorrection =
         vtkSmartPointer<vtkImageMathematics>::New();
       chromaticCorrection->SetOperationToMultiplyByK();
       chromaticCorrection->SetConstantK(chromatic_abberation);
@@ -467,18 +474,18 @@ int main(int argc, char* argv[])
       }
 
     } //End of iteration over image Pyramids
-  } //End of iteration over 
+  } //End of iteration over
   // Now imagePyramid[i].imagedata stores vtkImageData*. Level 0 has the image and as we go higher up we have the smoothed and downsampled image.
-  // For example, 
+  // For example,
 
 //   std::string iterationNumberString = std::to_string(i);
 //   std::string outputFileName = "OutputFrame" + iterationNumberString+".png";
 //   vtkSmartPointer<vtkPNGWriter> writeDifferenceFrames = vtkSmartPointer<vtkPNGWriter>::New();
 //   writeDifferenceFrames->SetFileName(outputFileName.c_str());
 //   writeDifferenceFrames->SetInputConnection(scaleDifference->GetOutputPort());
-//   writeDifferenceFrames->Write(); 
+//   writeDifferenceFrames->Write();
 // // Visualize
- 
+
 
 
 
@@ -488,7 +495,7 @@ int main(int argc, char* argv[])
 
   // mapper->SetInputConnection(resize->GetOutputPort());
 
-  //-------------------Suspected code snippet causing segmentation error----------------------------  
+  //-------------------Suspected code snippet causing segmentation error----------------------------
   // Why does mapper->SetInputData(imagePyramid[0].imagedata);  throw up an error?
   mapper->SetInputData(YDifference[0].imagedata);
     // mapper->SetInputData(differenceFilter->GetOutput);
