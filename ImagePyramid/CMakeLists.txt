@@ -8,7 +8,7 @@ set(CMAKE_BUILD_TYPE Debug)
 find_package(VTK REQUIRED)
 include(${VTK_USE_FILE})
 
-add_executable(ImagePyramid MACOSX_BUNDLE d ImagePyramid)
+add_executable(ImagePyramid MACOSX_BUNDLE ImagePyramid)
 
 if(VTK_LIBRARIES)
   target_link_libraries(ImagePyramid ${VTK_LIBRARIES})
