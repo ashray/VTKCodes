@@ -65,19 +65,14 @@ int main(int argc, char* argv[])
   imageStruct *IDifference = new imageStruct[NumberOfPyramidLevels];
   imageStruct *QDifference = new imageStruct[NumberOfPyramidLevels];
 
-  // Verify input arguments
-  // if(argc != 2)
-  //   {
-  //   std::cout << "Usage: " << argv[0]
-  //             << " Filename.vti" << std::endl;
-  //   return EXIT_FAILURE;
-  //   }
-  // if(argc < 2)
-  //   {
-  //   std::cout << "Usage: " << argv[0]
-  //             << " directoryName" << std::endl;
-  //   return EXIT_FAILURE;
-  //   }
+  imageStruct *lowPass1Y = new imageStruct[NumberOfPyramidLevels];
+  imageStruct *lowPass2Y = new imageStruct[NumberOfPyramidLevels];
+  imageStruct *lowPass1I = new imageStruct[NumberOfPyramidLevels];
+  imageStruct *lowPass2I = new imageStruct[NumberOfPyramidLevels];
+  imageStruct *lowPass1Q = new imageStruct[NumberOfPyramidLevels];
+  imageStruct *lowPass2Q = new imageStruct[NumberOfPyramidLevels];
+
+  int frameSize[NumberOfPyramidLevels];
 
   //TODO: Parse command line arguments
   std::string directoryName = "/Users/ashraymalhotra/Desktop/Academic/VTKDev/Data/ImageSequence/";
@@ -90,9 +85,6 @@ int main(int argc, char* argv[])
   glob->AddFileNames("*");
   int frameCount = glob->GetNumberOfFileNames();
   cout << "Number of Images read " << frameCount << "\n";
-
-  // cout << (glob->GetNthFileName(1));
-
 
   for (int ImageNumber = 0; ImageNumber < frameCount; ImageNumber++){
     std::string inputFilename = glob->GetNthFileName(ImageNumber);
@@ -147,34 +139,20 @@ int main(int argc, char* argv[])
           imageSource = extractQFilter;
           break;
       }
-      //---------------------Parts below make the image pyramid---------------------
-      // http://www.vtk.org/doc/nightly/html/classvtkImageMagnify.html
-      // Somehow get the image pixel height and width from the image reader. Search for functions
+
+      // ---------------------Image Pyramid Construction---------------------
       int* a = imageReader->GetOutput()->GetExtent();
       int imageDimension1 = a[1] - a[0] + 1;
       int imageDimension2 = a[3] - a[2] + 1;
 
       vtkSmartPointer<vtkImageGaussianSmooth> gaussianSmoothFilter;
       vtkSmartPointer<vtkImageResize> resize;
-      // imageType images[6];
-      // Used sips -g pixelWidth image.png to get the above values
 
-      // int a = 0;
-      // a = imageReader->GetFileDimensionality();
-      // cout << a << "\n";
-      // cout << imageReader->GetNumberOfScalarComponents() << "\n";
       imagePyramid[0].imagedata->ShallowCopy(imageSource->GetOutput());
 
       // if (!imagePyramid[0].imagedata) printf("0 is NULL!\n");
       for (int i=1; i<NumberOfPyramidLevels; i++){
-        // Gaussian smoothing
-        // vtkSmartPointer<vtkImageGaussianSmooth> gaussianSmoothFilter =
-        //   vtkSmartPointer<vtkImageGaussianSmooth>::New();
-        // gaussianSmoothFilter->SetInputConnection(imageReader->GetOutputPort());
-        // gaussianSmoothFilter->Update();
-
-        gaussianSmoothFilter =
-          vtkSmartPointer<vtkImageGaussianSmooth>::New();
+        gaussianSmoothFilter = vtkSmartPointer<vtkImageGaussianSmooth>::New();
         // gaussianSmoothFilter->SetInputData(imagePyramid[i-1].imagedata);
         gaussianSmoothFilter->SetInputData(imagePyramid[i-1].imagedata);
         gaussianSmoothFilter->Update();
@@ -192,8 +170,9 @@ int main(int argc, char* argv[])
         resize->Update();
         imagePyramid[i].imagedata->ShallowCopy(resize->GetOutput());
       }
+      // ------------------Image Pyramid construction complete--------------
 
-      //-------------Copy Image Pyramid for frame numbers greater than 1-------
+      // -------------Copy Image Pyramid into corresponding variable-------
       switch (j){
         case 0:
           {
@@ -221,10 +200,47 @@ int main(int argc, char* argv[])
             break;
           }
       }
-      //--------------------------------------------------------------------
+      // --------Copied image pyramid into corresponding variable-------------
 
+      // // -------------Copy Image Pyramid for first frame--------------------------
+      // // Initialising the Previous frame pyramid for frame 1. We initialise it to the first frame(which means first value of frame difference is going to be zero)
+      // if (!ImageNumber)
+      // {
+      //   switch (j)
+      //   {
+      //     case 0:
+      //     {
+      //       //Make the code below in a seperate function to copy image pyramids
+      //       for (int k=0; k<NumberOfPyramidLevels; k++)
+      //       {
+      //         YPyramidPreviousFrame[k].imagedata->ShallowCopy(YPyramid[k].imagedata);
+      //       }
+      //       break;
+      //     }
+      //     case 1:
+      //     {
+      //       for (int k=0; k<NumberOfPyramidLevels; k++)
+      //       {
+      //         IPyramidPreviousFrame[k].imagedata->ShallowCopy(IPyramid[k].imagedata);
+      //       }
+      //       break;
+      //     }
+      //     case 2:
+      //     {
+      //       for (int k=0; k<NumberOfPyramidLevels; k++)
+      //       {
+      //         QPyramidPreviousFrame[k].imagedata->ShallowCopy(QPyramid[k].imagedata);
+      //       }
+      //       break;
+      //     }
+      //   }
+      // }
+      // //--------------------------------------------------------------------
 
-      //-------------Copy Image Pyramid-----------------------------------
+      int r1 = 0.4;
+      int r2 = 0.05;
+
+      // -------------initialising lowPass with first frame--------------------------
       // Initialising the Previous frame pyramid for frame 1. We initialise it to the first frame(which means first value of frame difference is going to be zero)
       if (!ImageNumber)
       {
@@ -235,7 +251,8 @@ int main(int argc, char* argv[])
             //Make the code below in a seperate function to copy image pyramids
             for (int k=0; k<NumberOfPyramidLevels; k++)
             {
-              YPyramidPreviousFrame[k].imagedata->ShallowCopy(YPyramid[k].imagedata);
+              lowPass1Y[k].imagedata->ShallowCopy(YPyramid[k].imagedata);
+              lowPass2Y[k].imagedata->ShallowCopy(YPyramid[k].imagedata);
             }
             break;
           }
@@ -243,7 +260,8 @@ int main(int argc, char* argv[])
           {
             for (int k=0; k<NumberOfPyramidLevels; k++)
             {
-              IPyramidPreviousFrame[k].imagedata->ShallowCopy(IPyramid[k].imagedata);
+              lowPass1I[k].imagedata->ShallowCopy(IPyramid[k].imagedata);
+              lowPass2I[k].imagedata->ShallowCopy(IPyramid[k].imagedata);
             }
             break;
           }
@@ -251,105 +269,232 @@ int main(int argc, char* argv[])
           {
             for (int k=0; k<NumberOfPyramidLevels; k++)
             {
-              QPyramidPreviousFrame[k].imagedata->ShallowCopy(QPyramid[k].imagedata);
+              lowPass1Q[k].imagedata->ShallowCopy(QPyramid[k].imagedata);
+              lowPass2Q[k].imagedata->ShallowCopy(QPyramid[k].imagedata);
             }
             break;
           }
         }
-      }
-      //--------------------------------------------------------------------
-
-
-      //---------------Calculate difference of Image Pyramids----------------------------
-      vtkSmartPointer<vtkImageDifference> differenceFilter = vtkSmartPointer<vtkImageDifference>::New();
-      differenceFilter->AllowShiftOff();
-      differenceFilter->AveragingOff();
-      differenceFilter->SetAllowShift(0);
-      differenceFilter->SetThreshold(0);
-      vtkSmartPointer<vtkImageMathematics> imageMath =
-        vtkSmartPointer<vtkImageMathematics>::New();
-      imageMath->SetOperationToSubtract();
-      switch(j)
+      } //--------------------------------------------------------------------
+      else
       {
-        case 0:
+        //---------Temporal IIR(Infinite impulse response) filtering-----------
+        // ----Updating lowpass variable------
+        vtkSmartPointer<vtkImageWeightedSum> sumFilter1 = vtkSmartPointer<vtkImageWeightedSum>::New();
+        vtkSmartPointer<vtkImageWeightedSum> sumFilter2 = vtkSmartPointer<vtkImageWeightedSum>::New();
+        sumFilter1->SetWeight(0,r1);
+        sumFilter1->SetWeight(1,(1-r1));
+        sumFilter2->SetWeight(0,r2);
+        sumFilter2->SetWeight(1,(1-r2));
+        switch (j)
         {
-          for (int k=0; k<NumberOfPyramidLevels; k++)
+          case 0:
           {
-            // differenceFilter->SetInputData(QPyramidPreviousFrame[k].imagedata);
-            // differenceFilter->SetImageData(QPyramid[k].imagedata);
-            // differenceFilter->SetImageData(QPyramid[k].imagedata);
-            // differenceFilter->Update();
-            // YDifference[k].imagedata->ShallowCopy(differenceFilter->GetOutput());
+            for (int k=0; k<NumberOfPyramidLevels; k++)
+            {
+              sumFilter1->SetInputData(YPyramid[k].imagedata);
+              sumFilter1->AddInputData(lowPass1Y[k].imagedata);
+              sumFilter1->Update();
+              lowPass1Y[k].imagedata->ShallowCopy(sumFilter1->GetOutput());
+              sumFilter2->SetInputData(YPyramid[k].imagedata);
+              sumFilter2->AddInputData(lowPass2Y[k].imagedata);
+              sumFilter2->Update();
+              lowPass2Y[k].imagedata->ShallowCopy(sumFilter1->GetOutput());
+            }
+            break;
+          }
+          case 1:
+          {
+            for (int k=0; k<NumberOfPyramidLevels; k++)
+            {
+              sumFilter1->SetInputData(IPyramid[k].imagedata);
+              sumFilter1->AddInputData(lowPass1I[k].imagedata);
+              sumFilter1->Update();
+              lowPass1I[k].imagedata->ShallowCopy(sumFilter1->GetOutput());
+              sumFilter2->SetInputData(IPyramid[k].imagedata);
+              sumFilter2->AddInputData(lowPass2I[k].imagedata);
+              sumFilter2->Update();
+              lowPass2I[k].imagedata->ShallowCopy(sumFilter1->GetOutput());
+            }
+            break;
+          }
+          case 2:
+          {
+            for (int k=0; k<NumberOfPyramidLevels; k++)
+            {
+              sumFilter1->SetInputData(QPyramid[k].imagedata);
+              sumFilter1->AddInputData(lowPass1Q[k].imagedata);
+              sumFilter1->Update();
+              lowPass1Q[k].imagedata->ShallowCopy(sumFilter1->GetOutput());
+              sumFilter2->SetInputData(QPyramid[k].imagedata);
+              sumFilter2->AddInputData(lowPass2Q[k].imagedata);
+              sumFilter2->Update();
+              lowPass2Q[k].imagedata->ShallowCopy(sumFilter1->GetOutput());            }
+            break;
+          }
+        }
+        //-----Updated lowpass variable-------
 
-            imageMath->SetInput1Data(YPyramidPreviousFrame[k].imagedata);
-            imageMath->SetInput2Data(YPyramid[k].imagedata);
-            imageMath->Update();
-            YDifference[k].imagedata->ShallowCopy(imageMath->GetOutput());
-          }
-          break;
-        }
-        case 1:
+        //----Image Pyramid difference for IIR filtering------
+        vtkSmartPointer<vtkImageDifference> differenceFilter = vtkSmartPointer<vtkImageDifference>::New();
+        differenceFilter->AllowShiftOff();
+        differenceFilter->AveragingOff();
+        differenceFilter->SetAllowShift(0);
+        differenceFilter->SetThreshold(0);
+        // Verify that image mathematics works the way we would expect it to!!
+        vtkSmartPointer<vtkImageMathematics> imageMath = vtkSmartPointer<vtkImageMathematics>::New();
+        imageMath->SetOperationToSubtract();
+        switch(j)
         {
-          for (int k=0; k<NumberOfPyramidLevels; k++)
+          case 0:
           {
-            imageMath->SetInput1Data(IPyramidPreviousFrame[k].imagedata);
-            imageMath->SetInput2Data(IPyramid[k].imagedata);
-            imageMath->Update();
-            IDifference[k].imagedata->ShallowCopy(imageMath->GetOutput());
+            for (int k=0; k<NumberOfPyramidLevels; k++)
+            {
+              imageMath->SetInput1Data(lowPass1Y[k].imagedata);
+              imageMath->SetInput2Data(lowPass2Y[k].imagedata);
+              imageMath->Update();
+              YDifference[k].imagedata->ShallowCopy(imageMath->GetOutput());
+            }
+            break;
           }
-          break;
+          case 1:
+          {
+            for (int k=0; k<NumberOfPyramidLevels; k++)
+            {
+              imageMath->SetInput1Data(lowPass1I[k].imagedata);
+              imageMath->SetInput2Data(lowPass2I[k].imagedata);
+              imageMath->Update();
+              IDifference[k].imagedata->ShallowCopy(imageMath->GetOutput());
+            }
+            break;
+          }
+          case 2:
+          {
+            for (int k=0; k<NumberOfPyramidLevels; k++)
+            {
+              imageMath->SetInput1Data(lowPass1Q[k].imagedata);
+              imageMath->SetInput2Data(lowPass2Q[k].imagedata);
+              imageMath->Update();
+              QDifference[k].imagedata->ShallowCopy(imageMath->GetOutput());
+            }
+            break;
+          }
         }
-        case 2:
+        // ------End of pyramid difference------
+      // ------------------End of temporal filtering-------------------------------------------
+
+      // ----------------Get image dimensions for spatial filtering----------------------
+        for (int k=0; k<NumberOfPyramidLevels; k++)
         {
-          for (int k=0; k<NumberOfPyramidLevels; k++)
-          {
-            imageMath->SetInput1Data(QPyramidPreviousFrame[k].imagedata);
-            imageMath->SetInput2Data(QPyramid[k].imagedata);
-            imageMath->Update();
-            QDifference[k].imagedata->ShallowCopy(imageMath->GetOutput());
-          }
-          break;
+          // Will the below code work or not?? Is imagedata returned as a pointer? Verify.
+          int* a = lowPass1Q[k].imagedata->GetExtent();
+          int imageDimension1 = a[1] - a[0] + 1;
+          int imageDimension2 = a[3] - a[2] + 1;
+          frameSize[k] = pow((pow(imageDimension1,2) + pow(imageDimension2,2)), 0.5)/3;
+          // 3 is an experimental constant used by the authors of the paper
         }
+      // ---------------------------------------------------------------------------------
+
+
+      // ----------------Spatial Filtering----------------------
+      // Refer to the diagram included in the paper for explanation of the code below
+
+      //!!!!!!!!!!Assign the top and bottom of the image pyramid to zero!!!!!
+
+        alpha = 10;
+        lambda_c = 16;
+        delta = lambda_c/8/(1+alpha);
+        //exaggeration_factor HAS to be a user defined constant, above values could be hardcoded as well
+        exaggeration_factor = 20;
+        vtkSmartPointer<vtkImageMathematics> differenceBooster = vtkSmartPointer<vtkImageMathematics>::New();
+        differenceBooster->SetOperationToMultiplyByK();
+
+
+        differenceBooster->Update();
+        switch(j)
+        {
+          case 0:
+          {
+            for (int k=1; k<NumberOfPyramidLevels-1; k++)
+            {
+              int currAlpha = frameSize[k]/(delta*8) - 1;
+              currAlpha = currAlpha * exaggeration_factor;
+              int mutiplier = currAlpha;
+              if (mutiplier > alpha)
+              {
+                mutiplier = alpha
+              }
+              // ----------Verify that multiplier is a float--------
+              differenceBooster->SetConstantK(mutiplier);
+              // differenceBooster->SetInputConnection(imageSource->GetOutputPort());
+              differenceBooster->SetInput1Data(YDifference[k].imagedata);
+              differenceBooster->Update();
+              YDifference[k].imagedata->ShallowCopy(differenceBooster->GetOutput())
+              // YDifference[k] =
+            }
+            break;
+          }
+          case 1:
+          {
+            for (int k=1; k<NumberOfPyramidLevels-1; k++)
+            {
+              imageMath->SetInput1Data(lowPass1I[k].imagedata);
+              imageMath->SetInput2Data(lowPass2I[k].imagedata);
+              imageMath->Update();
+              IDifference[k].imagedata->ShallowCopy(imageMath->GetOutput());
+            }
+            break;
+          }
+          case 2:
+          {
+            for (int k=1; k<NumberOfPyramidLevels-1; k++)
+            {
+              imageMath->SetInput1Data(lowPass1Q[k].imagedata);
+              imageMath->SetInput2Data(lowPass2Q[k].imagedata);
+              imageMath->Update();
+              QDifference[k].imagedata->ShallowCopy(imageMath->GetOutput());
+            }
+            break;
+          }
+        }
+
+
+
       }
-
-      //---------------------------------------------------------------------------------
-
-
-      //Writing this again so that it is easier later to seperate into different functions
-      switch (j)
-      {
-        case 0:
-        {
-          //Make the code below in a seperate function to copy image pyramids
-          for (int k=0; k<NumberOfPyramidLevels; k++)
-          {
-            // YDifference[k].imagedata->ShallowCopy(Difference ( YPyramid[k].imagedata - YPyramidPreviousFrame[k].imagedata ));
-            YPyramidPreviousFrame[k].imagedata->ShallowCopy(YPyramid[k].imagedata);
-          }
-          break;
-        }
-        case 1:
-        {
-          for (int k=0; k<NumberOfPyramidLevels; k++)
-          {
-            IPyramidPreviousFrame[k].imagedata->ShallowCopy(imagePyramid[k].imagedata);
-          }
-          break;
-        }
-        case 2:
-        {
-          for (int k=0; k<NumberOfPyramidLevels; k++)
-          {
-            QPyramidPreviousFrame[k].imagedata->ShallowCopy(imagePyramid[k].imagedata);
-          }
-          break;
-        }
-      }
+      // // ----------------Copy image pyramid for all frames except first-------------------
+      // // Writing this again so that it is easier later to seperate into different functions
+      // switch (j)
+      // {
+      //   case 0:
+      //   {
+      //     //Make the code below in a seperate function to copy image pyramids
+      //     for (int k=0; k<NumberOfPyramidLevels; k++)
+      //     {
+      //       // YDifference[k].imagedata->ShallowCopy(Difference ( YPyramid[k].imagedata - YPyramidPreviousFrame[k].imagedata ));
+      //       YPyramidPreviousFrame[k].imagedata->ShallowCopy(YPyramid[k].imagedata);
+      //     }
+      //     break;
+      //   }
+      //   case 1:
+      //   {
+      //     for (int k=0; k<NumberOfPyramidLevels; k++)
+      //     {
+      //       IPyramidPreviousFrame[k].imagedata->ShallowCopy(imagePyramid[k].imagedata);
+      //     }
+      //     break;
+      //   }
+      //   case 2:
+      //   {
+      //     for (int k=0; k<NumberOfPyramidLevels; k++)
+      //     {
+      //       QPyramidPreviousFrame[k].imagedata->ShallowCopy(imagePyramid[k].imagedata);
+      //     }
+      //     break;
+      //   }
+      // }
+      // // ---------------------------------------------------------------------------------
 
       //-----------Collapse the image Pyramid------------------------
-
-      //vtkSmartPointer<vtkImageGaussianSmooth> gaussianSmoothFilter;
-      //vtkSmartPointer<vtkImageResize> resize;
       imagePyramid[0].imagedata->ShallowCopy(imageSource->GetOutput());
 
       for (int i=1; i<NumberOfPyramidLevels; i++){
@@ -365,28 +510,10 @@ int main(int argc, char* argv[])
 #else
         resize->SetInputData(gaussianSmoothFilter->GetOutput());
 #endif
-        resize->SetOutputDimensions(imageDimension1/(2i), imageDimension2/(2*i), 1);
+        resize->SetOutputDimensions(imageDimension1/(pow(2,i)), imageDimension2/(pow(2,i)), 1);
         resize->Update();
         imagePyramid[i].imagedata->ShallowCopy(resize->GetOutput());
       }
-
-      //How to collapse an image Pyramid??
-  // def collapse(lapl_pyr):
-  // output = None
-  // output = np.zeros((lapl_pyr[0].shape[0],lapl_pyr[0].shape[1]), dtype=np.float64)
-  // for i in range(len(lapl_pyr)-1,0,-1):
-  //   lap = iexpand(lapl_pyr[i])
-  //   lapb = lapl_pyr[i-1]
-  //   if lap.shape[0] > lapb.shape[0]:
-  //     lap = np.delete(lap,(-1),axis=0)
-  //   if lap.shape[1] > lapb.shape[1]:
-  //     lap = np.delete(lap,(-1),axis=1)
-  //   tmp = lap + lapb
-  //   lapl_pyr.pop()
-  //   lapl_pyr.pop()
-  //   lapl_pyr.append(tmp)
-  //   output = tmp
-  // return output
 
       // Verify that the algorithm to implement the laplacian pyramid is correct
       resize = vtkSmartPointer<vtkImageResize>::New();
@@ -436,10 +563,7 @@ int main(int argc, char* argv[])
         sumFilter->AddInputData(YDifference[g-1].imagedata);
         sumFilter->Update();
       }
-      //     break;
-      //   }
-      // }
-      //------------------------------------------
+      //---------------Pyramid Collapsed into image---------------------------
 
 
       //----------Chromatic Abberation to reduce noise---------------
