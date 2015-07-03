@@ -424,13 +424,12 @@ int main(int argc, char* argv[])
               {
                 mutiplier = alpha
               }
-              // ----------Verify that multiplier is a float--------
+              // ----------Verify that multiplier is a float(or acceptable data format for SetConstantK)--------
               differenceBooster->SetConstantK(mutiplier);
               // differenceBooster->SetInputConnection(imageSource->GetOutputPort());
               differenceBooster->SetInput1Data(YDifference[k].imagedata);
               differenceBooster->Update();
               YDifference[k].imagedata->ShallowCopy(differenceBooster->GetOutput())
-              // YDifference[k] =
             }
             break;
           }
@@ -438,10 +437,19 @@ int main(int argc, char* argv[])
           {
             for (int k=1; k<NumberOfPyramidLevels-1; k++)
             {
-              imageMath->SetInput1Data(lowPass1I[k].imagedata);
-              imageMath->SetInput2Data(lowPass2I[k].imagedata);
-              imageMath->Update();
-              IDifference[k].imagedata->ShallowCopy(imageMath->GetOutput());
+              int currAlpha = frameSize[k]/(delta*8) - 1;
+              currAlpha = currAlpha * exaggeration_factor;
+              int mutiplier = currAlpha;
+              if (mutiplier > alpha)
+              {
+                mutiplier = alpha
+              }
+              // ----------Verify that multiplier is a float(or acceptable data format for SetConstantK)--------
+              differenceBooster->SetConstantK(mutiplier);
+              // differenceBooster->SetInputConnection(imageSource->GetOutputPort());
+              differenceBooster->SetInput1Data(IDifference[k].imagedata);
+              differenceBooster->Update();
+              IDifference[k].imagedata->ShallowCopy(differenceBooster->GetOutput())
             }
             break;
           }
@@ -449,156 +457,167 @@ int main(int argc, char* argv[])
           {
             for (int k=1; k<NumberOfPyramidLevels-1; k++)
             {
-              imageMath->SetInput1Data(lowPass1Q[k].imagedata);
-              imageMath->SetInput2Data(lowPass2Q[k].imagedata);
-              imageMath->Update();
-              QDifference[k].imagedata->ShallowCopy(imageMath->GetOutput());
+              int currAlpha = frameSize[k]/(delta*8) - 1;
+              currAlpha = currAlpha * exaggeration_factor;
+              int mutiplier = currAlpha;
+              if (mutiplier > alpha)
+              {
+                mutiplier = alpha
+              }
+              // ----------Verify that multiplier is a float(or acceptable data format for SetConstantK)--------
+              differenceBooster->SetConstantK(mutiplier);
+              // differenceBooster->SetInputConnection(imageSource->GetOutputPort());
+              differenceBooster->SetInput1Data(QDifference[k].imagedata);
+              differenceBooster->Update();
+              QDifference[k].imagedata->ShallowCopy(differenceBooster->GetOutput())
             }
             break;
           }
         }
+        // -------------End of spatial filtering----------------------
 
+        //-------------VERIFY THE ALGO TO COLLAPSE PYRAMID. SEEMS WRONG---------------
+        //-----------Collapse the image Pyramid------------------------
+        imagePyramid[0].imagedata->ShallowCopy(imageSource->GetOutput());
 
+        for (int i=1; i<NumberOfPyramidLevels; i++){
+          gaussianSmoothFilter =
+            vtkSmartPointer<vtkImageGaussianSmooth>::New();
+          gaussianSmoothFilter->SetInputData(imagePyramid[i-1].imagedata);
+          gaussianSmoothFilter->Update();
 
-      }
-      // // ----------------Copy image pyramid for all frames except first-------------------
-      // // Writing this again so that it is easier later to seperate into different functions
-      // switch (j)
-      // {
-      //   case 0:
-      //   {
-      //     //Make the code below in a seperate function to copy image pyramids
-      //     for (int k=0; k<NumberOfPyramidLevels; k++)
-      //     {
-      //       // YDifference[k].imagedata->ShallowCopy(Difference ( YPyramid[k].imagedata - YPyramidPreviousFrame[k].imagedata ));
-      //       YPyramidPreviousFrame[k].imagedata->ShallowCopy(YPyramid[k].imagedata);
-      //     }
-      //     break;
-      //   }
-      //   case 1:
-      //   {
-      //     for (int k=0; k<NumberOfPyramidLevels; k++)
-      //     {
-      //       IPyramidPreviousFrame[k].imagedata->ShallowCopy(imagePyramid[k].imagedata);
-      //     }
-      //     break;
-      //   }
-      //   case 2:
-      //   {
-      //     for (int k=0; k<NumberOfPyramidLevels; k++)
-      //     {
-      //       QPyramidPreviousFrame[k].imagedata->ShallowCopy(imagePyramid[k].imagedata);
-      //     }
-      //     break;
-      //   }
-      // }
-      // // ---------------------------------------------------------------------------------
+          resize = vtkSmartPointer<vtkImageResize>::New();
+          resize->SetResizeMethodToOutputDimensions();
+  #if VTK_MAJOR_VERSION <= 5
+          resize->SetInput(gaussianSmoothFilter->GetOutput());
+  #else
+          resize->SetInputData(gaussianSmoothFilter->GetOutput());
+  #endif
+          resize->SetOutputDimensions(imageDimension1/(pow(2,i)), imageDimension2/(pow(2,i)), 1);
+          resize->Update();
+          imagePyramid[i].imagedata->ShallowCopy(resize->GetOutput());
+        }
 
-      //-----------Collapse the image Pyramid------------------------
-      imagePyramid[0].imagedata->ShallowCopy(imageSource->GetOutput());
-
-      for (int i=1; i<NumberOfPyramidLevels; i++){
-        gaussianSmoothFilter =
-          vtkSmartPointer<vtkImageGaussianSmooth>::New();
-        gaussianSmoothFilter->SetInputData(imagePyramid[i-1].imagedata);
-        gaussianSmoothFilter->Update();
-
+        // Verify that the algorithm to implement the laplacian pyramid is correct
         resize = vtkSmartPointer<vtkImageResize>::New();
-        resize->SetResizeMethodToOutputDimensions();
-#if VTK_MAJOR_VERSION <= 5
-        resize->SetInput(gaussianSmoothFilter->GetOutput());
-#else
-        resize->SetInputData(gaussianSmoothFilter->GetOutput());
-#endif
-        resize->SetOutputDimensions(imageDimension1/(pow(2,i)), imageDimension2/(pow(2,i)), 1);
-        resize->Update();
-        imagePyramid[i].imagedata->ShallowCopy(resize->GetOutput());
-      }
-
-      // Verify that the algorithm to implement the laplacian pyramid is correct
-      resize = vtkSmartPointer<vtkImageResize>::New();
-      gaussianSmoothFilter = vtkSmartPointer<vtkImageGaussianSmooth>::New();
-      vtkSmartPointer<vtkImageWeightedSum> sumFilter = vtkSmartPointer<vtkImageWeightedSum>::New();
-      sumFilter->SetWeight(0,0.5);
-      sumFilter->SetWeight(1,0.5);
-      resize->SetResizeMethodToOutputDimensions();
-      // switch (j)
-      // {
-      //   case 0:
-      //   {
-      for (int g = (NumberOfPyramidLevels-1); g>=1; g--)
-      {
-        // vtkSmartPointer<vtkImageWeightedSum> sumFilter = vtkSmartPointer<vtkImageWeightedSum>::New();
-        // sumFilter->SetWeight(0,0.5);
-        // sumFilter->SetWeight(1,0.5);
-        if (g == (NumberOfPyramidLevels-1))
-        {
-#if VTK_MAJOR_VERSION <= 5
-          resize->SetInput(YDifference[g].imagedata);
-#else
-          resize->SetInputData(YDifference[g].imagedata);
-#endif
-        }
-
-        else
-        {
-#if VTK_MAJOR_VERSION <= 5
-          resize->SetInput(sumFilter->GetOutput());
-#else
-          resize->SetInputData(sumFilter->GetOutput());
-#endif
-        }
-
-        sumFilter = NULL;
-        sumFilter = vtkSmartPointer<vtkImageWeightedSum>::New();
+        gaussianSmoothFilter = vtkSmartPointer<vtkImageGaussianSmooth>::New();
+        vtkSmartPointer<vtkImageWeightedSum> sumFilter = vtkSmartPointer<vtkImageWeightedSum>::New();
         sumFilter->SetWeight(0,0.5);
         sumFilter->SetWeight(1,0.5);
-
-        resize->SetOutputDimensions(imageDimension1/pow(2,(g-1)), imageDimension2/pow(2,(g-1)), -1);
-        resize->Update();
-
-        gaussianSmoothFilter->SetInputData(resize->GetOutput());
-        gaussianSmoothFilter->Update();
-        sumFilter->SetInputData(gaussianSmoothFilter->GetOutput());
-        sumFilter->AddInputData(YDifference[g-1].imagedata);
-        sumFilter->Update();
-      }
-      //---------------Pyramid Collapsed into image---------------------------
-
-
-      //----------Chromatic Abberation to reduce noise---------------
-      double chromatic_abberation = 0.1; //User given input
-      vtkSmartPointer<vtkImageMathematics> chromaticCorrection =
-        vtkSmartPointer<vtkImageMathematics>::New();
-      chromaticCorrection->SetOperationToMultiplyByK();
-      chromaticCorrection->SetConstantK(chromatic_abberation);
-      switch(j)
-      {
-        //Do nothing for Y channel
-        case 1:
+        resize->SetResizeMethodToOutputDimensions();
+        for (int g = (NumberOfPyramidLevels-1); g>=1; g--)
         {
-          for (int k=0; k<NumberOfPyramidLevels; k++)
+          if (g == (NumberOfPyramidLevels-1))
           {
-            chromaticCorrection->SetInput1Data(IDifference[k].imagedata);
-            chromaticCorrection->Update();
-            IDifference[k].imagedata->ShallowCopy(chromaticCorrection->GetOutput());
+            switch (j) {
+              case 0:
+              {
+                #if VTK_MAJOR_VERSION <= 5
+                          resize->SetInput(YDifference[g].imagedata);
+                #else
+                          resize->SetInputData(YDifference[g].imagedata);
+                #endif
+                break;
+              }
+              case 1:
+              {
+                #if VTK_MAJOR_VERSION <= 5
+                          resize->SetInput(IDifference[g].imagedata);
+                #else
+                          resize->SetInputData(IDifference[g].imagedata);
+                #endif
+                break;
+              }
+              case 2:
+              {
+                #if VTK_MAJOR_VERSION <= 5
+                          resize->SetInput(QDifference[g].imagedata);
+                #else
+                          resize->SetInputData(QDifference[g].imagedata);
+                #endif
+                break;
+              }
+            }
           }
-          break;
-        }
-        case 2:
-        {
-          for (int k=0; k<NumberOfPyramidLevels; k++)
+          else
           {
-            chromaticCorrection->SetInput1Data(QDifference[k].imagedata);
-            chromaticCorrection->Update();
-            QDifference[k].imagedata->ShallowCopy(chromaticCorrection->GetOutput());
+  #if VTK_MAJOR_VERSION <= 5
+            resize->SetInput(sumFilter->GetOutput());
+  #else
+            resize->SetInputData(sumFilter->GetOutput());
+  #endif
           }
-          break;
-        }
-      }
 
-    } //End of iteration over image Pyramids
-  } //End of iteration over
+          sumFilter = NULL;
+          sumFilter = vtkSmartPointer<vtkImageWeightedSum>::New();
+          sumFilter->SetWeight(0,0.5);
+          sumFilter->SetWeight(1,0.5);
+
+          resize->SetOutputDimensions(imageDimension1/pow(2,(g-1)), imageDimension2/pow(2,(g-1)), -1);
+          resize->Update();
+
+          gaussianSmoothFilter->SetInputData(resize->GetOutput());
+          gaussianSmoothFilter->Update();
+          sumFilter->SetInputData(gaussianSmoothFilter->GetOutput());
+          switch (j) {
+            case 0:
+            {
+              sumFilter->AddInputData(YDifference[g-1].imagedata);
+              break;
+            }
+            case 1:
+            {
+              sumFilter->AddInputData(IDifference[g-1].imagedata);
+              break;
+            }
+            case 2:
+            {
+              sumFilter->AddInputData(QDifference[g-1].imagedata);
+              break;
+            }
+          }
+          sumFilter->Update();
+        }
+        //---------------Pyramid Collapsed into image---------------------------
+
+
+        //----------Chromatic Abberation to reduce noise---------------
+        double chromatic_abberation = 0.1; //User given input
+        vtkSmartPointer<vtkImageMathematics> chromaticCorrection =
+          vtkSmartPointer<vtkImageMathematics>::New();
+        chromaticCorrection->SetOperationToMultiplyByK();
+        chromaticCorrection->SetConstantK(chromatic_abberation);
+        switch(j)
+        {
+          //Do nothing for Y channel
+          case 1:
+          {
+            for (int k=0; k<NumberOfPyramidLevels; k++)
+            {
+              chromaticCorrection->SetInput1Data(IDifference[k].imagedata);
+              chromaticCorrection->Update();
+              IDifference[k].imagedata->ShallowCopy(chromaticCorrection->GetOutput());
+            }
+            break;
+          }
+          case 2:
+          {
+            for (int k=0; k<NumberOfPyramidLevels; k++)
+            {
+              chromaticCorrection->SetInput1Data(QDifference[k].imagedata);
+              chromaticCorrection->Update();
+              QDifference[k].imagedata->ShallowCopy(chromaticCorrection->GetOutput());
+            }
+            break;
+          }
+        }
+      }   // End of the else loop(to perform operations only for frame numbers greater than 1)
+    } //End of iteration over the 3 color channels
+
+    // -----------------Debugging tip. Try to look at the color channel differences. We know what to expect in each of the color channels
+
+    // Now we have the magnified color channel differences in YDifference, IDifference and QDifference
+  } //End of iteration over all input frames of the video(input images)
   // Now imagePyramid[i].imagedata stores vtkImageData*. Level 0 has the image and as we go higher up we have the smoothed and downsampled image.
   // For example,
 
