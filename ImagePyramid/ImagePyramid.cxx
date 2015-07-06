@@ -71,6 +71,15 @@ int main(int argc, char* argv[])
   imageStruct *lowPass2I = new imageStruct[NumberOfPyramidLevels];
   imageStruct *lowPass1Q = new imageStruct[NumberOfPyramidLevels];
   imageStruct *lowPass2Q = new imageStruct[NumberOfPyramidLevels];
+  vtkImageData* FrameDifferenceY;
+  vtkImageData* FrameDifferenceI;
+  vtkImageData* FrameDifferenceQ;
+  vtkImageData* OutputFrameY;
+  vtkImageData* OutputFrameI;
+  vtkImageData* OutputFrameQ;
+  vtkSmartPointer<vtkImageExtractComponents> imageSource; //Moved outside since we need it to add back the differences
+
+
 
   int frameSize[NumberOfPyramidLevels];
 
@@ -125,7 +134,6 @@ int main(int argc, char* argv[])
     extractQFilter->Update();
     //-----------------------------------------------------------------------------
 
-    vtkSmartPointer<vtkImageExtractComponents> imageSource;
     int NumberOfPyramidLevels = 6;
     for (int j=0; j<3; j++){
       switch (j){
@@ -580,6 +588,22 @@ int main(int argc, char* argv[])
         }
         //---------------Pyramid Collapsed into image---------------------------
 
+        // --------------Save the final image in corresponding difference variable---------
+        switch (j) {
+          case 0:
+          {
+            FrameDifferenceY->ShallowCopy(sumFilter->GetOutput());
+          }
+          case 1:
+          {
+            FrameDifferenceI->ShallowCopy(sumFilter->GetOutput());
+          }
+          case 2:
+          {
+            FrameDifferenceQ->ShallowCopy(sumFilter->GetOutput());
+          }
+        }
+
 
         //----------Chromatic Abberation to reduce noise---------------
         double chromatic_abberation = 0.1; //User given input
@@ -592,44 +616,74 @@ int main(int argc, char* argv[])
           //Do nothing for Y channel
           case 1:
           {
-            for (int k=0; k<NumberOfPyramidLevels; k++)
-            {
-              chromaticCorrection->SetInput1Data(IDifference[k].imagedata);
-              chromaticCorrection->Update();
-              IDifference[k].imagedata->ShallowCopy(chromaticCorrection->GetOutput());
-            }
+            chromaticCorrection->SetInput1Data(FrameDifferenceI);
+            chromaticCorrection->Update();
+            FrameDifferenceI->ShallowCopy(chromaticCorrection->GetOutput());
             break;
           }
           case 2:
           {
-            for (int k=0; k<NumberOfPyramidLevels; k++)
-            {
-              chromaticCorrection->SetInput1Data(QDifference[k].imagedata);
-              chromaticCorrection->Update();
-              QDifference[k].imagedata->ShallowCopy(chromaticCorrection->GetOutput());
-            }
+            chromaticCorrection->SetInput1Data(FrameDifferenceQ);
+            chromaticCorrection->Update();
+            FrameDifferenceQ->ShallowCopy(chromaticCorrection->GetOutput());
+          }
+        }
+
+        //--------Add back frame difference to the original frame that we have read------
+        vtkSmartPointer<vtkImageWeightedSum> addDifferenceOrigFrameFilter =
+        vtkSmartPointer<vtkImageWeightedSum>::New();
+        // Note that we might have to multiply the intensity with a factor of 2 later...
+        addDifferenceOrigFrameFilter->SetWeight(0,.5);
+        addDifferenceOrigFrameFilter->SetWeight(1,.5);
+        addDifferenceOrigFrameFilter->AddInputData(imageSource->GetOutput());
+        switch (j) {
+          case 0:
+          {
+            addDifferenceOrigFrameFilter->SetInputData(FrameDifferenceY->GetOutput());
+            addDifferenceOrigFrameFilter->Update();
+            OutputFrameY->ShallowCopy(addDifferenceOrigFrameFilter->GetOutput());
+            break;
+          }
+          case 1:
+          {
+            addDifferenceOrigFrameFilter->SetInputData(FrameDifferenceI->GetOutput());
+            addDifferenceOrigFrameFilter->Update();
+            OutputFrameI->ShallowCopy(addDifferenceOrigFrameFilter->GetOutput());
+            break;
+          }
+          case 2:
+          {
+            addDifferenceOrigFrameFilter->SetInputData(FrameDifferenceQ->GetOutput());
+            addDifferenceOrigFrameFilter->Update();
+            OutputFrameQ->ShallowCopy(addDifferenceOrigFrameFilter->GetOutput());
             break;
           }
         }
+        //-------------------------------------------------------------------------
       }   // End of the else loop(to perform operations only for frame numbers greater than 1)
     } //End of iteration over the 3 color channels
 
     // -----------------Debugging tip. Try to look at the color channel differences. We know what to expect in each of the color channels
 
-    // Now we have the magnified color channel differences in YDifference, IDifference and QDifference
+    // ---------------------Combine color channels in 1 image------------------------
+    vtkSmartPointer<vtkImageAppendComponents> appendFilter =
+      vtkSmartPointer<vtkImageAppendComponents>::New();
+    appendFilter->SetInputData(OutputFrameY->GetOutput());
+    appendFilter->AddInputData(OutputFrameI->GetOutput());
+    appendFilter->AddInputData(OutputFrameQ->GetOutput());
+    appendFilter->Update();
+    // -------------------------------------------------------------------------------
+
+    // ---------------------Convert the YIQ frame to the RGB frame--------------------
+    vtkSmartPointer<vtkImageYIQToRGB> rgbConversionFilter =
+      vtkSmartPointer<vtkImageYIQToRGB>::New();
+    rgbConversionFilter->SetInputConnection(appendFilter->GetOutputPort());
+    rgbConversionFilter->Update();
+    // -------------------------------------------------------------------------------
+
+    // TODO - Output that frame in the mapper(or write the frame as a png file)
+
   } //End of iteration over all input frames of the video(input images)
-  // Now imagePyramid[i].imagedata stores vtkImageData*. Level 0 has the image and as we go higher up we have the smoothed and downsampled image.
-  // For example,
-
-//   std::string iterationNumberString = std::to_string(i);
-//   std::string outputFileName = "OutputFrame" + iterationNumberString+".png";
-//   vtkSmartPointer<vtkPNGWriter> writeDifferenceFrames = vtkSmartPointer<vtkPNGWriter>::New();
-//   writeDifferenceFrames->SetFileName(outputFileName.c_str());
-//   writeDifferenceFrames->SetInputConnection(scaleDifference->GetOutputPort());
-//   writeDifferenceFrames->Write();
-// // Visualize
-
-
 
 
   vtkSmartPointer<vtkDataSetMapper> mapper =
