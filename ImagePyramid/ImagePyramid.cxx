@@ -25,10 +25,12 @@
 #include <vtkImageResize.h>
 #include "vtkImageSincInterpolator.h"
 #include <vtkImageRGBToYIQ.h>
+#include <vtkImageYIQToRGB.h>
 
 #include <vtkGlobFileNames.h>
 #include <vtksys/SystemTools.hxx>
 #include <string>
+#include <sstream>
 #include <cstdio>
 #include <cmath>
 #include "vtkStringArray.h"
@@ -37,8 +39,16 @@
 #include <vtkImageDifference.h>
 #include <vtkImageMathematics.h>
 #include <vtkImageWeightedSum.h>
+#include <vtkImageAppendComponents.h>
 
-
+std::string showDims (vtkImageData *img)
+{
+  std::ostringstream strm;
+  int *exts;
+  exts = img->GetExtent();
+  strm << "(" << exts[1] - exts[0] << ", " << exts[3] - exts[2] << ", " << exts[5] - exts[4] << ")";
+  return strm.str();
+}
 
 // Originally defined as struct but with a struct the variables go out of scope and hence get deleted.
 class imageStruct
@@ -71,13 +81,16 @@ int main(int argc, char* argv[])
   imageStruct *lowPass2I = new imageStruct[NumberOfPyramidLevels];
   imageStruct *lowPass1Q = new imageStruct[NumberOfPyramidLevels];
   imageStruct *lowPass2Q = new imageStruct[NumberOfPyramidLevels];
-  vtkImageData* FrameDifferenceY;
-  vtkImageData* FrameDifferenceI;
-  vtkImageData* FrameDifferenceQ;
-  vtkImageData* OutputFrameY;
-  vtkImageData* OutputFrameI;
-  vtkImageData* OutputFrameQ;
+
+  vtkSmartPointer<vtkImageData> FrameDifferenceY = vtkSmartPointer<vtkImageData>::New();
+  vtkSmartPointer<vtkImageData> FrameDifferenceI = vtkSmartPointer<vtkImageData>::New();
+  vtkSmartPointer<vtkImageData> FrameDifferenceQ = vtkSmartPointer<vtkImageData>::New();
+  vtkSmartPointer<vtkImageData> OutputFrameY = vtkSmartPointer<vtkImageData>::New();
+  vtkSmartPointer<vtkImageData> OutputFrameI = vtkSmartPointer<vtkImageData>::New();
+  vtkSmartPointer<vtkImageData> OutputFrameQ = vtkSmartPointer<vtkImageData>::New();
   vtkSmartPointer<vtkImageExtractComponents> imageSource; //Moved outside since we need it to add back the differences
+  vtkSmartPointer<vtkImageYIQToRGB> rgbConversionFilter =
+    vtkSmartPointer<vtkImageYIQToRGB>::New(); // Made a global variable so that can be accessed by mapper
 
 
 
@@ -210,43 +223,8 @@ int main(int argc, char* argv[])
       }
       // --------Copied image pyramid into corresponding variable-------------
 
-      // // -------------Copy Image Pyramid for first frame--------------------------
-      // // Initialising the Previous frame pyramid for frame 1. We initialise it to the first frame(which means first value of frame difference is going to be zero)
-      // if (!ImageNumber)
-      // {
-      //   switch (j)
-      //   {
-      //     case 0:
-      //     {
-      //       //Make the code below in a seperate function to copy image pyramids
-      //       for (int k=0; k<NumberOfPyramidLevels; k++)
-      //       {
-      //         YPyramidPreviousFrame[k].imagedata->ShallowCopy(YPyramid[k].imagedata);
-      //       }
-      //       break;
-      //     }
-      //     case 1:
-      //     {
-      //       for (int k=0; k<NumberOfPyramidLevels; k++)
-      //       {
-      //         IPyramidPreviousFrame[k].imagedata->ShallowCopy(IPyramid[k].imagedata);
-      //       }
-      //       break;
-      //     }
-      //     case 2:
-      //     {
-      //       for (int k=0; k<NumberOfPyramidLevels; k++)
-      //       {
-      //         QPyramidPreviousFrame[k].imagedata->ShallowCopy(QPyramid[k].imagedata);
-      //       }
-      //       break;
-      //     }
-      //   }
-      // }
-      // //--------------------------------------------------------------------
-
-      int r1 = 0.4;
-      int r2 = 0.05;
+      float r1 = 0.4;
+      float r2 = 0.05;
 
       // -------------initialising lowPass with first frame--------------------------
       // Initialising the Previous frame pyramid for frame 1. We initialise it to the first frame(which means first value of frame difference is going to be zero)
@@ -349,7 +327,7 @@ int main(int argc, char* argv[])
         differenceFilter->AveragingOff();
         differenceFilter->SetAllowShift(0);
         differenceFilter->SetThreshold(0);
-        // Verify that image mathematics works the way we would expect it to!!
+        // TODO Verify that image mathematics works the way we would expect it to!!
         vtkSmartPointer<vtkImageMathematics> imageMath = vtkSmartPointer<vtkImageMathematics>::New();
         imageMath->SetOperationToSubtract();
         switch(j)
@@ -409,16 +387,15 @@ int main(int argc, char* argv[])
 
       //!!!!!!!!!!Assign the top and bottom of the image pyramid to zero!!!!!
 
-        alpha = 10;
-        lambda_c = 16;
+        int alpha = 10;
+        int lambda_c = 16;
+        float delta;
         delta = lambda_c/8/(1+alpha);
         //exaggeration_factor HAS to be a user defined constant, above values could be hardcoded as well
-        exaggeration_factor = 20;
+        int exaggeration_factor = 20;
         vtkSmartPointer<vtkImageMathematics> differenceBooster = vtkSmartPointer<vtkImageMathematics>::New();
         differenceBooster->SetOperationToMultiplyByK();
 
-
-        differenceBooster->Update();
         switch(j)
         {
           case 0:
@@ -430,14 +407,14 @@ int main(int argc, char* argv[])
               int mutiplier = currAlpha;
               if (mutiplier > alpha)
               {
-                mutiplier = alpha
+                mutiplier = alpha;
               }
               // ----------Verify that multiplier is a float(or acceptable data format for SetConstantK)--------
               differenceBooster->SetConstantK(mutiplier);
               // differenceBooster->SetInputConnection(imageSource->GetOutputPort());
               differenceBooster->SetInput1Data(YDifference[k].imagedata);
               differenceBooster->Update();
-              YDifference[k].imagedata->ShallowCopy(differenceBooster->GetOutput())
+              YDifference[k].imagedata->ShallowCopy(differenceBooster->GetOutput());
             }
             break;
           }
@@ -450,14 +427,14 @@ int main(int argc, char* argv[])
               int mutiplier = currAlpha;
               if (mutiplier > alpha)
               {
-                mutiplier = alpha
+                mutiplier = alpha;
               }
               // ----------Verify that multiplier is a float(or acceptable data format for SetConstantK)--------
               differenceBooster->SetConstantK(mutiplier);
               // differenceBooster->SetInputConnection(imageSource->GetOutputPort());
               differenceBooster->SetInput1Data(IDifference[k].imagedata);
               differenceBooster->Update();
-              IDifference[k].imagedata->ShallowCopy(differenceBooster->GetOutput())
+              IDifference[k].imagedata->ShallowCopy(differenceBooster->GetOutput());
             }
             break;
           }
@@ -470,41 +447,23 @@ int main(int argc, char* argv[])
               int mutiplier = currAlpha;
               if (mutiplier > alpha)
               {
-                mutiplier = alpha
+                mutiplier = alpha;
               }
               // ----------Verify that multiplier is a float(or acceptable data format for SetConstantK)--------
               differenceBooster->SetConstantK(mutiplier);
               // differenceBooster->SetInputConnection(imageSource->GetOutputPort());
               differenceBooster->SetInput1Data(QDifference[k].imagedata);
               differenceBooster->Update();
-              QDifference[k].imagedata->ShallowCopy(differenceBooster->GetOutput())
+              QDifference[k].imagedata->ShallowCopy(differenceBooster->GetOutput());
             }
             break;
           }
         }
         // -------------End of spatial filtering----------------------
 
+
         //-------------VERIFY THE ALGO TO COLLAPSE PYRAMID. SEEMS WRONG---------------
         //-----------Collapse the image Pyramid------------------------
-        imagePyramid[0].imagedata->ShallowCopy(imageSource->GetOutput());
-
-        for (int i=1; i<NumberOfPyramidLevels; i++){
-          gaussianSmoothFilter =
-            vtkSmartPointer<vtkImageGaussianSmooth>::New();
-          gaussianSmoothFilter->SetInputData(imagePyramid[i-1].imagedata);
-          gaussianSmoothFilter->Update();
-
-          resize = vtkSmartPointer<vtkImageResize>::New();
-          resize->SetResizeMethodToOutputDimensions();
-  #if VTK_MAJOR_VERSION <= 5
-          resize->SetInput(gaussianSmoothFilter->GetOutput());
-  #else
-          resize->SetInputData(gaussianSmoothFilter->GetOutput());
-  #endif
-          resize->SetOutputDimensions(imageDimension1/(pow(2,i)), imageDimension2/(pow(2,i)), 1);
-          resize->Update();
-          imagePyramid[i].imagedata->ShallowCopy(resize->GetOutput());
-        }
 
         // Verify that the algorithm to implement the laplacian pyramid is correct
         resize = vtkSmartPointer<vtkImageResize>::New();
@@ -585,24 +544,31 @@ int main(int argc, char* argv[])
             }
           }
           sumFilter->Update();
+
+          // --------------Save the final image in corresponding difference variable---------
+          if (g==1)
+          {
+            switch (j)
+            {
+              case 0:
+              {
+                FrameDifferenceY->ShallowCopy(sumFilter->GetOutput());
+              }
+              case 1:
+              {
+                FrameDifferenceI->ShallowCopy(sumFilter->GetOutput());
+                break;
+              }
+              case 2:
+              {
+                FrameDifferenceQ->ShallowCopy(sumFilter->GetOutput());
+                break;
+              }
+            }
+          }
         }
         //---------------Pyramid Collapsed into image---------------------------
 
-        // --------------Save the final image in corresponding difference variable---------
-        switch (j) {
-          case 0:
-          {
-            FrameDifferenceY->ShallowCopy(sumFilter->GetOutput());
-          }
-          case 1:
-          {
-            FrameDifferenceI->ShallowCopy(sumFilter->GetOutput());
-          }
-          case 2:
-          {
-            FrameDifferenceQ->ShallowCopy(sumFilter->GetOutput());
-          }
-        }
 
 
         //----------Chromatic Abberation to reduce noise---------------
@@ -613,7 +579,7 @@ int main(int argc, char* argv[])
         chromaticCorrection->SetConstantK(chromatic_abberation);
         switch(j)
         {
-          //Do nothing for Y channel
+          // Do nothing for Y channel
           case 1:
           {
             chromaticCorrection->SetInput1Data(FrameDifferenceI);
@@ -635,55 +601,56 @@ int main(int argc, char* argv[])
         // Note that we might have to multiply the intensity with a factor of 2 later...
         addDifferenceOrigFrameFilter->SetWeight(0,.5);
         addDifferenceOrigFrameFilter->SetWeight(1,.5);
-        addDifferenceOrigFrameFilter->AddInputData(imageSource->GetOutput());
+        addDifferenceOrigFrameFilter->SetInputData(imageSource->GetOutput());
         switch (j) {
           case 0:
           {
-            addDifferenceOrigFrameFilter->SetInputData(FrameDifferenceY->GetOutput());
+            addDifferenceOrigFrameFilter->AddInputData(FrameDifferenceY);
             addDifferenceOrigFrameFilter->Update();
             OutputFrameY->ShallowCopy(addDifferenceOrigFrameFilter->GetOutput());
             break;
           }
           case 1:
           {
-            addDifferenceOrigFrameFilter->SetInputData(FrameDifferenceI->GetOutput());
+            addDifferenceOrigFrameFilter->AddInputData(FrameDifferenceI);
             addDifferenceOrigFrameFilter->Update();
             OutputFrameI->ShallowCopy(addDifferenceOrigFrameFilter->GetOutput());
             break;
           }
           case 2:
           {
-            addDifferenceOrigFrameFilter->SetInputData(FrameDifferenceQ->GetOutput());
+            addDifferenceOrigFrameFilter->AddInputData(FrameDifferenceQ);
             addDifferenceOrigFrameFilter->Update();
             OutputFrameQ->ShallowCopy(addDifferenceOrigFrameFilter->GetOutput());
             break;
           }
         }
         //-------------------------------------------------------------------------
+
+        // -----------------Debugging tip. Try to look at the color channel differences. We know what to expect in each of the color channels
+
       }   // End of the else loop(to perform operations only for frame numbers greater than 1)
     } //End of iteration over the 3 color channels
-
-    // -----------------Debugging tip. Try to look at the color channel differences. We know what to expect in each of the color channels
-
     // ---------------------Combine color channels in 1 image------------------------
     vtkSmartPointer<vtkImageAppendComponents> appendFilter =
       vtkSmartPointer<vtkImageAppendComponents>::New();
-    appendFilter->SetInputData(OutputFrameY->GetOutput());
-    appendFilter->AddInputData(OutputFrameI->GetOutput());
-    appendFilter->AddInputData(OutputFrameQ->GetOutput());
+    cerr << "Y dims: " << showDims(OutputFrameY) << endl
+         << "I dims: " << showDims(OutputFrameI) << endl
+         << "Q dims: " << showDims(OutputFrameQ) << endl;
+    appendFilter->AddInputData(OutputFrameY);
+    appendFilter->AddInputData(OutputFrameI);
+    appendFilter->AddInputData(OutputFrameQ);
     appendFilter->Update();
     // -------------------------------------------------------------------------------
 
     // ---------------------Convert the YIQ frame to the RGB frame--------------------
-    vtkSmartPointer<vtkImageYIQToRGB> rgbConversionFilter =
-      vtkSmartPointer<vtkImageYIQToRGB>::New();
     rgbConversionFilter->SetInputConnection(appendFilter->GetOutputPort());
     rgbConversionFilter->Update();
     // -------------------------------------------------------------------------------
 
     // TODO - Output that frame in the mapper(or write the frame as a png file)
 
-  } //End of iteration over all input frames of the video(input images)
+
 
 
   vtkSmartPointer<vtkDataSetMapper> mapper =
@@ -694,7 +661,8 @@ int main(int argc, char* argv[])
 
   //-------------------Suspected code snippet causing segmentation error----------------------------
   // Why does mapper->SetInputData(imagePyramid[0].imagedata);  throw up an error?
-  mapper->SetInputData(YDifference[0].imagedata);
+  // mapper->SetInputData(YDifference[0].imagedata);
+  mapper->SetInputData(rgbConversionFilter->GetOutput());
     // mapper->SetInputData(differenceFilter->GetOutput);
   // mapper->SetInputData(resize->GetOutput());
   //--------------------------------------------------------------------------------------------------
@@ -720,6 +688,6 @@ int main(int argc, char* argv[])
   renderWindowInteractor->Initialize();
 
   renderWindowInteractor->Start();
-
+  } //End of iteration over all input frames of the video(input images)
   return EXIT_SUCCESS;
 }
