@@ -51,7 +51,7 @@ std::string showDims (vtkImageData *img)
   return strm.str();
 }
 
-// Originally defined as struct but with a struct the variables go out of scope and hence get deleted.
+// Originally defined as struct, hence the improper naming.
 class imageStruct
 {
   public:
@@ -62,7 +62,8 @@ class imageStruct
 
 int main(int argc, char* argv[])
 {
-  // Have to define these variables as global since used in mapper
+
+  // Have to define these variables as global since used in mapper, can be optimised better
   int NumberOfPyramidLevels = 6;
   imageStruct *imagePyramid = new imageStruct[NumberOfPyramidLevels];
   imageStruct *YPyramid = new imageStruct[NumberOfPyramidLevels];
@@ -96,9 +97,7 @@ int main(int argc, char* argv[])
 
 
   int frameSize[NumberOfPyramidLevels];
-
-  //TODO: Parse command line arguments
-  std::string directoryName = "/Users/ashraymalhotra/Desktop/Academic/VTKDev/Data/ImageSequence/";
+  std::string directoryName = "/Users/ashraymalhotra/Desktop/Academic/VTKDev/Data/AllImages/";
 
   // Create reader to read all images
   std::string dirString = directoryName;
@@ -113,17 +112,14 @@ int main(int argc, char* argv[])
     std::string inputFilename = glob->GetNthFileName(ImageNumber);
     cout << inputFilename << "\n";
 
-    // std::string inputFilename = "image.png";
-
     // Read the file
     vtkSmartPointer<vtkImageReader2Factory> readerFactory =
       vtkSmartPointer<vtkImageReader2Factory>::New();
     vtkImageReader2 * imageReader = readerFactory->CreateImageReader2(inputFilename.c_str());
     imageReader->SetFileName(inputFilename.c_str());
     imageReader->Update();
-    // cout << __LINE__<<" Reached here \n";
 
-    //--------------This part should go into an extract YIQ filter----------------
+    // ---------------------Get YIQ components-----------------------------
     vtkSmartPointer<vtkImageRGBToYIQ> yiqFilter =
       vtkSmartPointer<vtkImageRGBToYIQ>::New();
     yiqFilter->SetInputConnection(imageReader->GetOutputPort());
@@ -146,7 +142,7 @@ int main(int argc, char* argv[])
     extractQFilter->SetInputConnection(yiqFilter->GetOutputPort());
     extractQFilter->SetComponents(2);
     extractQFilter->Update();
-    //-----------------------------------------------------------------------------
+    //-------------------------------------------------------------------------
 
     int NumberOfPyramidLevels = 6;
     for (int j=0; j<3; j++){
@@ -172,14 +168,12 @@ int main(int argc, char* argv[])
 
       imagePyramid[0].imagedata->ShallowCopy(imageSource->GetOutput());
 
-      // if (!imagePyramid[0].imagedata) printf("0 is NULL!\n");
       for (int i=1; i<NumberOfPyramidLevels; i++){
         gaussianSmoothFilter = vtkSmartPointer<vtkImageGaussianSmooth>::New();
-        // gaussianSmoothFilter->SetInputData(imagePyramid[i-1].imagedata);
         gaussianSmoothFilter->SetInputData(imagePyramid[i-1].imagedata);
         gaussianSmoothFilter->Update();
 
-        // Can set standard deviation of the gaussian filter using "SetStandardDeviation (double std)"
+        // Need to take care of gaussian pyramid variance
 
         resize = vtkSmartPointer<vtkImageResize>::New();
         resize->SetResizeMethodToOutputDimensions();
@@ -198,7 +192,6 @@ int main(int argc, char* argv[])
       switch (j){
         case 0:
           {
-            //Make the code below in a seperate function to copy image pyramids
             for (int k=0; k<NumberOfPyramidLevels; k++)
             {
               YPyramid[k].imagedata->ShallowCopy(imagePyramid[k].imagedata);
@@ -266,7 +259,7 @@ int main(int argc, char* argv[])
       else
       {
         //---------Temporal IIR(Infinite impulse response) filtering-----------
-        // ----Updating lowpass variable------
+        // -------Updating lowpass variable------
         vtkSmartPointer<vtkImageWeightedSum> sumFilter1 = vtkSmartPointer<vtkImageWeightedSum>::New();
         vtkSmartPointer<vtkImageWeightedSum> sumFilter2 = vtkSmartPointer<vtkImageWeightedSum>::New();
         sumFilter1->SetWeight(0,r1);
@@ -323,13 +316,12 @@ int main(int argc, char* argv[])
         }
         //-----Updated lowpass variable-------
 
-        //----Image Pyramid difference for IIR filtering------
+        //----Image Pyramid difference for IIR filtering-----
         vtkSmartPointer<vtkImageDifference> differenceFilter = vtkSmartPointer<vtkImageDifference>::New();
         differenceFilter->AllowShiftOff();
         differenceFilter->AveragingOff();
         differenceFilter->SetAllowShift(0);
         differenceFilter->SetThreshold(0);
-        // TODO Verify that image mathematics works the way we would expect it to!!
         vtkSmartPointer<vtkImageMathematics> imageMath = vtkSmartPointer<vtkImageMathematics>::New();
         imageMath->SetOperationToSubtract();
         switch(j)
@@ -369,19 +361,18 @@ int main(int argc, char* argv[])
           }
         }
         // ------End of pyramid difference------
-      // ------------------End of temporal filtering-------------------------------------------
+      // ------------------End of temporal filtering---------------------------
 
-      // ----------------Get image dimensions for spatial filtering----------------------
+      // ----------------Get image dimensions for spatial filtering------------
         for (int k=0; k<NumberOfPyramidLevels; k++)
         {
-          // Will the below code work or not?? Is imagedata returned as a pointer? Verify.
           int* a = lowPass1Q[k].imagedata->GetExtent();
           int imageDimension1 = a[1] - a[0] + 1;
           int imageDimension2 = a[3] - a[2] + 1;
           frameSize[k] = pow((pow(imageDimension1,2) + pow(imageDimension2,2)), 0.5)/3;
           // 3 is an experimental constant used by the authors of the paper
         }
-      // ---------------------------------------------------------------------------------
+      // ----------------------------------------------------------------------
 
 
       // ----------------Spatial Filtering----------------------
@@ -390,6 +381,7 @@ int main(int argc, char* argv[])
       // ----------Code below causes seg fault--------------------
 
       //---------Assign the top and bottom of the image pyramid to zero--------
+
         // switch(j)
         // {
         //   case 0:
@@ -480,8 +472,8 @@ int main(int argc, char* argv[])
         int lambda_c = 16;
         float delta;
         delta = lambda_c/8/(1+alpha);
-        //exaggeration_factor HAS to be a user defined constant, above values could be hardcoded as well
-        int exaggeration_factor = 20;
+        //exaggeration_factor HAS to be a user defined constant, above values could be hardcoded as well, preferrably not
+        int exaggeration_factor = 60;
         vtkSmartPointer<vtkImageMathematics> differenceBooster = vtkSmartPointer<vtkImageMathematics>::New();
         differenceBooster->SetOperationToMultiplyByK();
 
@@ -500,7 +492,6 @@ int main(int argc, char* argv[])
               }
               // ----------Verify that multiplier is a float(or acceptable data format for SetConstantK)--------
               differenceBooster->SetConstantK(mutiplier);
-              // differenceBooster->SetInputConnection(imageSource->GetOutputPort());
               differenceBooster->SetInput1Data(YDifference[k].imagedata);
               differenceBooster->Update();
               YDifference[k].imagedata->ShallowCopy(differenceBooster->GetOutput());
@@ -518,9 +509,7 @@ int main(int argc, char* argv[])
               {
                 mutiplier = alpha;
               }
-              // ----------Verify that multiplier is a float(or acceptable data format for SetConstantK)--------
               differenceBooster->SetConstantK(mutiplier);
-              // differenceBooster->SetInputConnection(imageSource->GetOutputPort());
               differenceBooster->SetInput1Data(IDifference[k].imagedata);
               differenceBooster->Update();
               IDifference[k].imagedata->ShallowCopy(differenceBooster->GetOutput());
@@ -538,9 +527,7 @@ int main(int argc, char* argv[])
               {
                 mutiplier = alpha;
               }
-              // ----------Verify that multiplier is a float(or acceptable data format for SetConstantK)--------
               differenceBooster->SetConstantK(mutiplier);
-              // differenceBooster->SetInputConnection(imageSource->GetOutputPort());
               differenceBooster->SetInput1Data(QDifference[k].imagedata);
               differenceBooster->Update();
               QDifference[k].imagedata->ShallowCopy(differenceBooster->GetOutput());
@@ -743,18 +730,15 @@ int main(int argc, char* argv[])
       rgbConversionFilter->Update();
       // -------------------------------------------------------------------------------
 
-      // TODO - Output that frame in the mapper(or write the frame as a png file)
-
       std::string iterationNumberString = std::to_string(ImageNumber);
       std::string outputFileName = "OutputFrame" + iterationNumberString+".png";
       vtkSmartPointer<vtkPNGWriter> writeDifferenceFrames = vtkSmartPointer<vtkPNGWriter>::New();
       writeDifferenceFrames->SetFileName(outputFileName.c_str());
-      // writeDifferenceFrames->SetInputConnection(scaleDifference->GetOutputPort());
       writeDifferenceFrames->SetInputData(rgbConversionFilter->GetOutput());
-      // writeDifferenceFrames->SetInputData(OutputFrameY);
       writeDifferenceFrames->Write();
     }
     
+  // --------Use the code below to visualise the frames instead of writing the frames to disk---------
 
   // vtkSmartPointer<vtkDataSetMapper> mapper =
   //   vtkSmartPointer<vtkDataSetMapper>::New();
