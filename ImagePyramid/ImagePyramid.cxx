@@ -387,19 +387,19 @@ int main(int argc, char* argv[])
       // ----------------Spatial Filtering----------------------
       // Refer to the diagram included in the paper for explanation of the code below
 
-      //!!!!!!!!!!Assign the top and bottom of the image pyramid to zero!!!!!
+      // ----------Code below causes seg fault--------------------
+
+      //---------Assign the top and bottom of the image pyramid to zero--------
         // switch(j)
         // {
         //   case 0:
         //   {
-        //       // Fill every entry of the image data with "2.0"
-        //     // int* dims = YDifference[0].imagedata->GetDimensions();
         //     int* a = YDifference[0].imagedata->GetExtent();
-        //     int imageDimension1 = a[1] - a[0] + 1;
-        //     int imageDimension2 = a[3] - a[2] + 1;
-        //     for (int y = 0; y < imageDimension2; y++)
+        //     int Y0Dimension1 = a[1] - a[0] + 1;
+        //     int Y0Dimension2 = a[3] - a[2] + 1;
+        //     for (int y = 0; y < Y0Dimension2; y++)
         //     {
-        //       for (int x = 0; x < imageDimension1; x++)
+        //       for (int x = 0; x < Y0Dimension1; x++)
         //       {
         //       double* pixel = static_cast<double*>(YDifference[0].imagedata->GetScalarPointer(x,y,0));
         //       pixel[0] = 0.0;
@@ -407,11 +407,11 @@ int main(int argc, char* argv[])
         //     }
 
         //     a = YDifference[NumberOfPyramidLevels-1].imagedata->GetExtent();
-        //     imageDimension1 = a[1] - a[0] + 1;
-        //     imageDimension2 = a[3] - a[2] + 1;
-        //     for (int y = 0; y < imageDimension2; y++)
+        //     int YNDimension1 = a[1] - a[0] + 1;
+        //     int YNDimension2 = a[3] - a[2] + 1;
+        //     for (int y = 0; y < YNDimension2; y++)
         //     {
-        //       for (int x = 0; x < imageDimension1; x++)
+        //       for (int x = 0; x < YNDimension1; x++)
         //       {
         //       double* pixel = static_cast<double*>(YDifference[NumberOfPyramidLevels-1].imagedata->GetScalarPointer(x,y,0));
         //       pixel[0] = 0.0;
@@ -419,7 +419,62 @@ int main(int argc, char* argv[])
         //     }
         //   break;
         //   }
+        //   case 1:
+        //   {
+        //     int* a = IDifference[0].imagedata->GetExtent();
+        //     int Y0Dimension1 = a[1] - a[0] + 1;
+        //     int Y0Dimension2 = a[3] - a[2] + 1;
+        //     for (int y = 0; y < Y0Dimension2; y++)
+        //     {
+        //       for (int x = 0; x < Y0Dimension1; x++)
+        //       {
+        //       double* pixel = static_cast<double*>(IDifference[0].imagedata->GetScalarPointer(x,y,0));
+        //       pixel[0] = 0.0;
+        //       }
+        //     }
+
+        //     a = IDifference[NumberOfPyramidLevels-1].imagedata->GetExtent();
+        //     int YNDimension1 = a[1] - a[0] + 1;
+        //     int YNDimension2 = a[3] - a[2] + 1;
+        //     for (int y = 0; y < YNDimension2; y++)
+        //     {
+        //       for (int x = 0; x < YNDimension1; x++)
+        //       {
+        //       double* pixel = static_cast<double*>(IDifference[NumberOfPyramidLevels-1].imagedata->GetScalarPointer(x,y,0));
+        //       pixel[0] = 0.0;
+        //       }
+        //     }
+        //   break;
+        //   }
+        //   case 2:
+        //   {
+        //     int* a = QDifference[0].imagedata->GetExtent();
+        //     int Y0Dimension1 = a[1] - a[0] + 1;
+        //     int Y0Dimension2 = a[3] - a[2] + 1;
+        //     for (int y = 0; y < Y0Dimension2; y++)
+        //     {
+        //       for (int x = 0; x < Y0Dimension1; x++)
+        //       {
+        //       double* pixel = static_cast<double*>(QDifference[0].imagedata->GetScalarPointer(x,y,0));
+        //       pixel[0] = 0.0;
+        //       }
+        //     }
+
+        //     a = QDifference[NumberOfPyramidLevels-1].imagedata->GetExtent();
+        //     int YNDimension1 = a[1] - a[0] + 1;
+        //     int YNDimension2 = a[3] - a[2] + 1;
+        //     for (int y = 0; y < YNDimension2; y++)
+        //     {
+        //       for (int x = 0; x < YNDimension1; x++)
+        //       {
+        //       double* pixel = static_cast<double*>(QDifference[NumberOfPyramidLevels-1].imagedata->GetScalarPointer(x,y,0));
+        //       pixel[0] = 0.0;
+        //       }
+        //     }
+        //   break;
+        //   }
         // }
+        // --------------------------------------------------------------
 
         int alpha = 10;
         int lambda_c = 16;
