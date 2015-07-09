@@ -40,6 +40,7 @@
 #include <vtkImageMathematics.h>
 #include <vtkImageWeightedSum.h>
 #include <vtkImageAppendComponents.h>
+#include <vtkPNGWriter.h>
 
 std::string showDims (vtkImageData *img)
 {
@@ -61,7 +62,7 @@ class imageStruct
 
 int main(int argc, char* argv[])
 {
-  //Have to define these variables as global since used in mapper
+  // Have to define these variables as global since used in mapper
   int NumberOfPyramidLevels = 6;
   imageStruct *imagePyramid = new imageStruct[NumberOfPyramidLevels];
   imageStruct *YPyramid = new imageStruct[NumberOfPyramidLevels];
@@ -88,7 +89,7 @@ int main(int argc, char* argv[])
   vtkSmartPointer<vtkImageData> OutputFrameY = vtkSmartPointer<vtkImageData>::New();
   vtkSmartPointer<vtkImageData> OutputFrameI = vtkSmartPointer<vtkImageData>::New();
   vtkSmartPointer<vtkImageData> OutputFrameQ = vtkSmartPointer<vtkImageData>::New();
-  vtkSmartPointer<vtkImageExtractComponents> imageSource; //Moved outside since we need it to add back the differences
+  vtkSmartPointer<vtkImageExtractComponents> imageSource; // Moved outside since we need it to add back the differences
   vtkSmartPointer<vtkImageYIQToRGB> rgbConversionFilter =
     vtkSmartPointer<vtkImageYIQToRGB>::New(); // Made a global variable so that can be accessed by mapper
 
@@ -228,7 +229,7 @@ int main(int argc, char* argv[])
 
       // -------------initialising lowPass with first frame--------------------------
       // Initialising the Previous frame pyramid for frame 1. We initialise it to the first frame(which means first value of frame difference is going to be zero)
-      if (!ImageNumber)
+      if (ImageNumber==0)
       {
         switch (j)
         {
@@ -285,7 +286,7 @@ int main(int argc, char* argv[])
               sumFilter2->SetInputData(YPyramid[k].imagedata);
               sumFilter2->AddInputData(lowPass2Y[k].imagedata);
               sumFilter2->Update();
-              lowPass2Y[k].imagedata->ShallowCopy(sumFilter1->GetOutput());
+              lowPass2Y[k].imagedata->ShallowCopy(sumFilter2->GetOutput());
             }
             break;
           }
@@ -300,7 +301,7 @@ int main(int argc, char* argv[])
               sumFilter2->SetInputData(IPyramid[k].imagedata);
               sumFilter2->AddInputData(lowPass2I[k].imagedata);
               sumFilter2->Update();
-              lowPass2I[k].imagedata->ShallowCopy(sumFilter1->GetOutput());
+              lowPass2I[k].imagedata->ShallowCopy(sumFilter2->GetOutput());
             }
             break;
           }
@@ -315,7 +316,8 @@ int main(int argc, char* argv[])
               sumFilter2->SetInputData(QPyramid[k].imagedata);
               sumFilter2->AddInputData(lowPass2Q[k].imagedata);
               sumFilter2->Update();
-              lowPass2Q[k].imagedata->ShallowCopy(sumFilter1->GetOutput());            }
+              lowPass2Q[k].imagedata->ShallowCopy(sumFilter2->GetOutput());
+            }
             break;
           }
         }
@@ -386,6 +388,38 @@ int main(int argc, char* argv[])
       // Refer to the diagram included in the paper for explanation of the code below
 
       //!!!!!!!!!!Assign the top and bottom of the image pyramid to zero!!!!!
+        // switch(j)
+        // {
+        //   case 0:
+        //   {
+        //       // Fill every entry of the image data with "2.0"
+        //     // int* dims = YDifference[0].imagedata->GetDimensions();
+        //     int* a = YDifference[0].imagedata->GetExtent();
+        //     int imageDimension1 = a[1] - a[0] + 1;
+        //     int imageDimension2 = a[3] - a[2] + 1;
+        //     for (int y = 0; y < imageDimension2; y++)
+        //     {
+        //       for (int x = 0; x < imageDimension1; x++)
+        //       {
+        //       double* pixel = static_cast<double*>(YDifference[0].imagedata->GetScalarPointer(x,y,0));
+        //       pixel[0] = 0.0;
+        //       }
+        //     }
+
+        //     a = YDifference[NumberOfPyramidLevels-1].imagedata->GetExtent();
+        //     imageDimension1 = a[1] - a[0] + 1;
+        //     imageDimension2 = a[3] - a[2] + 1;
+        //     for (int y = 0; y < imageDimension2; y++)
+        //     {
+        //       for (int x = 0; x < imageDimension1; x++)
+        //       {
+        //       double* pixel = static_cast<double*>(YDifference[NumberOfPyramidLevels-1].imagedata->GetScalarPointer(x,y,0));
+        //       pixel[0] = 0.0;
+        //       }
+        //     }
+        //   break;
+        //   }
+        // }
 
         int alpha = 10;
         int lambda_c = 16;
@@ -460,7 +494,6 @@ int main(int argc, char* argv[])
           }
         }
         // -------------End of spatial filtering----------------------
-
 
         //-------------VERIFY THE ALGO TO COLLAPSE PYRAMID. SEEMS WRONG---------------
         //-----------Collapse the image Pyramid------------------------
@@ -601,10 +634,11 @@ int main(int argc, char* argv[])
         // Note that we might have to multiply the intensity with a factor of 2 later...
         addDifferenceOrigFrameFilter->SetWeight(0,.5);
         addDifferenceOrigFrameFilter->SetWeight(1,.5);
-        addDifferenceOrigFrameFilter->SetInputData(imageSource->GetOutput());
+        // addDifferenceOrigFrameFilter->SetInputData(imageSource->GetOutput());
         switch (j) {
           case 0:
           {
+            addDifferenceOrigFrameFilter->SetInputData(extractYFilter->GetOutput());
             addDifferenceOrigFrameFilter->AddInputData(FrameDifferenceY);
             addDifferenceOrigFrameFilter->Update();
             OutputFrameY->ShallowCopy(addDifferenceOrigFrameFilter->GetOutput());
@@ -612,6 +646,7 @@ int main(int argc, char* argv[])
           }
           case 1:
           {
+            addDifferenceOrigFrameFilter->SetInputData(extractIFilter->GetOutput());
             addDifferenceOrigFrameFilter->AddInputData(FrameDifferenceI);
             addDifferenceOrigFrameFilter->Update();
             OutputFrameI->ShallowCopy(addDifferenceOrigFrameFilter->GetOutput());
@@ -619,75 +654,87 @@ int main(int argc, char* argv[])
           }
           case 2:
           {
+            addDifferenceOrigFrameFilter->SetInputData(extractQFilter->GetOutput());
             addDifferenceOrigFrameFilter->AddInputData(FrameDifferenceQ);
             addDifferenceOrigFrameFilter->Update();
             OutputFrameQ->ShallowCopy(addDifferenceOrigFrameFilter->GetOutput());
             break;
           }
         }
-        //-------------------------------------------------------------------------
+        //---------------------------------------------------------------------
 
         // -----------------Debugging tip. Try to look at the color channel differences. We know what to expect in each of the color channels
 
       }   // End of the else loop(to perform operations only for frame numbers greater than 1)
     } //End of iteration over the 3 color channels
+
     // ---------------------Combine color channels in 1 image------------------------
-    vtkSmartPointer<vtkImageAppendComponents> appendFilter =
-      vtkSmartPointer<vtkImageAppendComponents>::New();
-    cerr << "Y dims: " << showDims(OutputFrameY) << endl
-         << "I dims: " << showDims(OutputFrameI) << endl
-         << "Q dims: " << showDims(OutputFrameQ) << endl;
-    appendFilter->AddInputData(OutputFrameY);
-    appendFilter->AddInputData(OutputFrameI);
-    appendFilter->AddInputData(OutputFrameQ);
-    appendFilter->Update();
-    // -------------------------------------------------------------------------------
 
-    // ---------------------Convert the YIQ frame to the RGB frame--------------------
-    rgbConversionFilter->SetInputConnection(appendFilter->GetOutputPort());
-    rgbConversionFilter->Update();
-    // -------------------------------------------------------------------------------
+    if(ImageNumber!=0)
+    {
+      vtkSmartPointer<vtkImageAppendComponents> appendFilter =
+        vtkSmartPointer<vtkImageAppendComponents>::New();
+      cerr << "Y dims: " << showDims(OutputFrameY) << endl
+           << "I dims: " << showDims(OutputFrameI) << endl
+           << "Q dims: " << showDims(OutputFrameQ) << endl;
+      appendFilter->AddInputData(OutputFrameY);
+      appendFilter->AddInputData(OutputFrameI);
+      appendFilter->AddInputData(OutputFrameQ);
+      appendFilter->Update();
+      // -------------------------------------------------------------------------------
 
-    // TODO - Output that frame in the mapper(or write the frame as a png file)
+      // ---------------------Convert the YIQ frame to the RGB frame--------------------
+      rgbConversionFilter->SetInputConnection(appendFilter->GetOutputPort());
+      rgbConversionFilter->Update();
+      // -------------------------------------------------------------------------------
 
+      // TODO - Output that frame in the mapper(or write the frame as a png file)
 
+      std::string iterationNumberString = std::to_string(ImageNumber);
+      std::string outputFileName = "OutputFrame" + iterationNumberString+".png";
+      vtkSmartPointer<vtkPNGWriter> writeDifferenceFrames = vtkSmartPointer<vtkPNGWriter>::New();
+      writeDifferenceFrames->SetFileName(outputFileName.c_str());
+      // writeDifferenceFrames->SetInputConnection(scaleDifference->GetOutputPort());
+      writeDifferenceFrames->SetInputData(rgbConversionFilter->GetOutput());
+      // writeDifferenceFrames->SetInputData(OutputFrameY);
+      writeDifferenceFrames->Write();
+    }
+    
 
-
-  vtkSmartPointer<vtkDataSetMapper> mapper =
-    vtkSmartPointer<vtkDataSetMapper>::New();
-
-
-  // mapper->SetInputConnection(resize->GetOutputPort());
-
-  //-------------------Suspected code snippet causing segmentation error----------------------------
-  // Why does mapper->SetInputData(imagePyramid[0].imagedata);  throw up an error?
-  // mapper->SetInputData(YDifference[0].imagedata);
-  mapper->SetInputData(rgbConversionFilter->GetOutput());
-    // mapper->SetInputData(differenceFilter->GetOutput);
-  // mapper->SetInputData(resize->GetOutput());
-  //--------------------------------------------------------------------------------------------------
-
-  vtkSmartPointer<vtkActor> actor =
-    vtkSmartPointer<vtkActor>::New();
-  actor->SetMapper(mapper);
-  actor->GetProperty()->SetRepresentationToWireframe();
-
-  vtkSmartPointer<vtkRenderer> renderer =
-    vtkSmartPointer<vtkRenderer>::New();
-  renderer->AddActor(actor);
-  renderer->ResetCamera();
-  renderer->SetBackground(1,1,1);
-
-  vtkSmartPointer<vtkRenderWindow> renderWindow =
-    vtkSmartPointer<vtkRenderWindow>::New();
-  renderWindow->AddRenderer(renderer);
-
-  vtkSmartPointer<vtkRenderWindowInteractor> renderWindowInteractor =
-    vtkSmartPointer<vtkRenderWindowInteractor>::New();
-  renderWindowInteractor->SetRenderWindow(renderWindow);
-  renderWindowInteractor->Initialize();
-
-  renderWindowInteractor->Start();
+  // vtkSmartPointer<vtkDataSetMapper> mapper =
+  //   vtkSmartPointer<vtkDataSetMapper>::New();
+  //
+  // // mapper->SetInputConnection(resize->GetOutputPort());
+  //
+  // //-------------------Suspected code snippet causing segmentation error----------------------------
+  // // Why does mapper->SetInputData(imagePyramid[0].imagedata);  throw up an error?
+  // // mapper->SetInputData(YDifference[0].imagedata);
+  // mapper->SetInputData(rgbConversionFilter->GetOutput());
+  //   // mapper->SetInputData(differenceFilter->GetOutput);
+  // // mapper->SetInputData(resize->GetOutput());
+  // //--------------------------------------------------------------------------------------------------
+  //
+  // vtkSmartPointer<vtkActor> actor =
+  //   vtkSmartPointer<vtkActor>::New();
+  // actor->SetMapper(mapper);
+  // actor->GetProperty()->SetRepresentationToWireframe();
+  //
+  // vtkSmartPointer<vtkRenderer> renderer =
+  //   vtkSmartPointer<vtkRenderer>::New();
+  // renderer->AddActor(actor);
+  // renderer->ResetCamera();
+  // renderer->SetBackground(1,1,1);
+  //
+  // vtkSmartPointer<vtkRenderWindow> renderWindow =
+  //   vtkSmartPointer<vtkRenderWindow>::New();
+  // renderWindow->AddRenderer(renderer);
+  //
+  // vtkSmartPointer<vtkRenderWindowInteractor> renderWindowInteractor =
+  //   vtkSmartPointer<vtkRenderWindowInteractor>::New();
+  // renderWindowInteractor->SetRenderWindow(renderWindow);
+  // renderWindowInteractor->Initialize();
+  //
+  // renderWindowInteractor->Start();
   } //End of iteration over all input frames of the video(input images)
   return EXIT_SUCCESS;
 }
