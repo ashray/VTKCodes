@@ -1,3 +1,7 @@
+#define YChannel 0
+#define IChannel 1
+#define QChannel 2
+
 #include <vtkSmartPointer.h>
 #include <vtkProperty.h>
 #include <vtkDataSetMapper.h>
@@ -59,6 +63,21 @@ class imageStruct
   ~imageStruct() { this->imagedata = NULL; }
   vtkSmartPointer<vtkImageData> imagedata;
 };
+
+// Most of the variables used below are heuristics, please feel free to experiment.
+// -------Variables used in IIR(Infinite impulse response) magnification of the video-----
+int alpha = 10;
+int lambda_c = 16;
+float delta;
+delta = lambda_c/8/(1+alpha);
+//exaggeration_factor HAS to be a user defined constant, above values could be hardcoded as well, preferrably not
+int exaggeration_factor = 60;
+// ---------------------------------------------------------------------------------------
+
+// -------Spatial Filtering variables-----------
+float r1 = 0.4;
+float r2 = 0.05;
+// ---------------------------------------------------------------------------------------
 
 int main(int argc, char* argv[])
 {
@@ -147,13 +166,13 @@ int main(int argc, char* argv[])
     int NumberOfPyramidLevels = 6;
     for (int j=0; j<3; j++){
       switch (j){
-        case 0:
+        case YChannel:
           imageSource = extractYFilter;
           break;
-        case 1:
+        case IChannel:
           imageSource = extractIFilter;
           break;
-        case 2:
+        case QChannel:
           imageSource = extractQFilter;
           break;
       }
@@ -177,11 +196,7 @@ int main(int argc, char* argv[])
 
         resize = vtkSmartPointer<vtkImageResize>::New();
         resize->SetResizeMethodToOutputDimensions();
-#if VTK_MAJOR_VERSION <= 5
-        resize->SetInput(gaussianSmoothFilter->GetOutput());
-#else
         resize->SetInputData(gaussianSmoothFilter->GetOutput());
-#endif
         resize->SetOutputDimensions(imageDimension1/(pow(2,i)), imageDimension2/(pow(2,i)), 1);
         resize->Update();
         imagePyramid[i].imagedata->ShallowCopy(resize->GetOutput());
@@ -190,7 +205,7 @@ int main(int argc, char* argv[])
 
       // -------------Copy Image Pyramid into corresponding variable-------
       switch (j){
-        case 0:
+        case YChannel:
           {
             for (int k=0; k<NumberOfPyramidLevels; k++)
             {
@@ -198,7 +213,7 @@ int main(int argc, char* argv[])
             }
             break;
           }
-        case 1:
+        case IChannel:
           {
             for (int k=0; k<NumberOfPyramidLevels; k++)
             {
@@ -206,7 +221,7 @@ int main(int argc, char* argv[])
             }
             break;
           }
-        case 2:
+        case QChannel:
           {
             for (int k=0; k<NumberOfPyramidLevels; k++)
             {
@@ -217,8 +232,6 @@ int main(int argc, char* argv[])
       }
       // --------Copied image pyramid into corresponding variable-------------
 
-      float r1 = 0.4;
-      float r2 = 0.05;
 
       // -------------initialising lowPass with first frame--------------------------
       // Initialising the Previous frame pyramid for frame 1. We initialise it to the first frame(which means first value of frame difference is going to be zero)
@@ -226,7 +239,7 @@ int main(int argc, char* argv[])
       {
         switch (j)
         {
-          case 0:
+          case YChannel:
           {
             //Make the code below in a seperate function to copy image pyramids
             for (int k=0; k<NumberOfPyramidLevels; k++)
@@ -236,7 +249,7 @@ int main(int argc, char* argv[])
             }
             break;
           }
-          case 1:
+          case IChannel:
           {
             for (int k=0; k<NumberOfPyramidLevels; k++)
             {
@@ -245,7 +258,7 @@ int main(int argc, char* argv[])
             }
             break;
           }
-          case 2:
+          case QChannel:
           {
             for (int k=0; k<NumberOfPyramidLevels; k++)
             {
@@ -268,7 +281,7 @@ int main(int argc, char* argv[])
         sumFilter2->SetWeight(1,(1-r2));
         switch (j)
         {
-          case 0:
+          case YChannel:
           {
             for (int k=0; k<NumberOfPyramidLevels; k++)
             {
@@ -283,7 +296,7 @@ int main(int argc, char* argv[])
             }
             break;
           }
-          case 1:
+          case IChannel:
           {
             for (int k=0; k<NumberOfPyramidLevels; k++)
             {
@@ -298,7 +311,7 @@ int main(int argc, char* argv[])
             }
             break;
           }
-          case 2:
+          case QChannel:
           {
             for (int k=0; k<NumberOfPyramidLevels; k++)
             {
@@ -326,7 +339,7 @@ int main(int argc, char* argv[])
         imageMath->SetOperationToSubtract();
         switch(j)
         {
-          case 0:
+          case YChannel:
           {
             for (int k=0; k<NumberOfPyramidLevels; k++)
             {
@@ -337,7 +350,7 @@ int main(int argc, char* argv[])
             }
             break;
           }
-          case 1:
+          case IChannel:
           {
             for (int k=0; k<NumberOfPyramidLevels; k++)
             {
@@ -348,7 +361,7 @@ int main(int argc, char* argv[])
             }
             break;
           }
-          case 2:
+          case QChannel:
           {
             for (int k=0; k<NumberOfPyramidLevels; k++)
             {
@@ -374,112 +387,12 @@ int main(int argc, char* argv[])
         }
       // ----------------------------------------------------------------------
 
-
-      // ----------------Spatial Filtering----------------------
-      // Refer to the diagram included in the paper for explanation of the code below
-
-      // ----------Code below causes seg fault--------------------
-
-      //---------Assign the top and bottom of the image pyramid to zero--------
-
-        // switch(j)
-        // {
-        //   case 0:
-        //   {
-        //     int* a = YDifference[0].imagedata->GetExtent();
-        //     int Y0Dimension1 = a[1] - a[0] + 1;
-        //     int Y0Dimension2 = a[3] - a[2] + 1;
-        //     for (int y = 0; y < Y0Dimension2; y++)
-        //     {
-        //       for (int x = 0; x < Y0Dimension1; x++)
-        //       {
-        //       double* pixel = static_cast<double*>(YDifference[0].imagedata->GetScalarPointer(x,y,0));
-        //       pixel[0] = 0.0;
-        //       }
-        //     }
-
-        //     a = YDifference[NumberOfPyramidLevels-1].imagedata->GetExtent();
-        //     int YNDimension1 = a[1] - a[0] + 1;
-        //     int YNDimension2 = a[3] - a[2] + 1;
-        //     for (int y = 0; y < YNDimension2; y++)
-        //     {
-        //       for (int x = 0; x < YNDimension1; x++)
-        //       {
-        //       double* pixel = static_cast<double*>(YDifference[NumberOfPyramidLevels-1].imagedata->GetScalarPointer(x,y,0));
-        //       pixel[0] = 0.0;
-        //       }
-        //     }
-        //   break;
-        //   }
-        //   case 1:
-        //   {
-        //     int* a = IDifference[0].imagedata->GetExtent();
-        //     int Y0Dimension1 = a[1] - a[0] + 1;
-        //     int Y0Dimension2 = a[3] - a[2] + 1;
-        //     for (int y = 0; y < Y0Dimension2; y++)
-        //     {
-        //       for (int x = 0; x < Y0Dimension1; x++)
-        //       {
-        //       double* pixel = static_cast<double*>(IDifference[0].imagedata->GetScalarPointer(x,y,0));
-        //       pixel[0] = 0.0;
-        //       }
-        //     }
-
-        //     a = IDifference[NumberOfPyramidLevels-1].imagedata->GetExtent();
-        //     int YNDimension1 = a[1] - a[0] + 1;
-        //     int YNDimension2 = a[3] - a[2] + 1;
-        //     for (int y = 0; y < YNDimension2; y++)
-        //     {
-        //       for (int x = 0; x < YNDimension1; x++)
-        //       {
-        //       double* pixel = static_cast<double*>(IDifference[NumberOfPyramidLevels-1].imagedata->GetScalarPointer(x,y,0));
-        //       pixel[0] = 0.0;
-        //       }
-        //     }
-        //   break;
-        //   }
-        //   case 2:
-        //   {
-        //     int* a = QDifference[0].imagedata->GetExtent();
-        //     int Y0Dimension1 = a[1] - a[0] + 1;
-        //     int Y0Dimension2 = a[3] - a[2] + 1;
-        //     for (int y = 0; y < Y0Dimension2; y++)
-        //     {
-        //       for (int x = 0; x < Y0Dimension1; x++)
-        //       {
-        //       double* pixel = static_cast<double*>(QDifference[0].imagedata->GetScalarPointer(x,y,0));
-        //       pixel[0] = 0.0;
-        //       }
-        //     }
-
-        //     a = QDifference[NumberOfPyramidLevels-1].imagedata->GetExtent();
-        //     int YNDimension1 = a[1] - a[0] + 1;
-        //     int YNDimension2 = a[3] - a[2] + 1;
-        //     for (int y = 0; y < YNDimension2; y++)
-        //     {
-        //       for (int x = 0; x < YNDimension1; x++)
-        //       {
-        //       double* pixel = static_cast<double*>(QDifference[NumberOfPyramidLevels-1].imagedata->GetScalarPointer(x,y,0));
-        //       pixel[0] = 0.0;
-        //       }
-        //     }
-        //   break;
-        //   }
-        // }
-        // --------------------------------------------------------------
-
-        int alpha = 10;
-        int lambda_c = 16;
-        float delta;
-        delta = lambda_c/8/(1+alpha);
-        //exaggeration_factor HAS to be a user defined constant, above values could be hardcoded as well, preferrably not
-        int exaggeration_factor = 60;
         vtkSmartPointer<vtkImageMathematics> differenceBooster = vtkSmartPointer<vtkImageMathematics>::New();
         differenceBooster->SetOperationToMultiplyByK();
 
         switch(j)
         {
-          case 0:
+          case YChannel:
           {
             for (int k=1; k<NumberOfPyramidLevels-1; k++)
             {
@@ -498,7 +411,7 @@ int main(int argc, char* argv[])
             }
             break;
           }
-          case 1:
+          case IChannel:
           {
             for (int k=1; k<NumberOfPyramidLevels-1; k++)
             {
@@ -516,7 +429,7 @@ int main(int argc, char* argv[])
             }
             break;
           }
-          case 2:
+          case QChannel:
           {
             for (int k=1; k<NumberOfPyramidLevels-1; k++)
             {
@@ -552,42 +465,26 @@ int main(int argc, char* argv[])
           if (g == (NumberOfPyramidLevels-1))
           {
             switch (j) {
-              case 0:
+              case YChannel:
               {
-                #if VTK_MAJOR_VERSION <= 5
-                          resize->SetInput(YDifference[g].imagedata);
-                #else
-                          resize->SetInputData(YDifference[g].imagedata);
-                #endif
+                resize->SetInputData(YDifference[g].imagedata);
                 break;
               }
-              case 1:
+              case IChannel:
               {
-                #if VTK_MAJOR_VERSION <= 5
-                          resize->SetInput(IDifference[g].imagedata);
-                #else
-                          resize->SetInputData(IDifference[g].imagedata);
-                #endif
+                resize->SetInputData(IDifference[g].imagedata);
                 break;
               }
-              case 2:
+              case QChannel:
               {
-                #if VTK_MAJOR_VERSION <= 5
-                          resize->SetInput(QDifference[g].imagedata);
-                #else
-                          resize->SetInputData(QDifference[g].imagedata);
-                #endif
+                resize->SetInputData(QDifference[g].imagedata);
                 break;
               }
             }
           }
           else
           {
-  #if VTK_MAJOR_VERSION <= 5
-            resize->SetInput(sumFilter->GetOutput());
-  #else
             resize->SetInputData(sumFilter->GetOutput());
-  #endif
           }
 
           sumFilter = NULL;
@@ -602,17 +499,17 @@ int main(int argc, char* argv[])
           gaussianSmoothFilter->Update();
           sumFilter->SetInputData(gaussianSmoothFilter->GetOutput());
           switch (j) {
-            case 0:
+            case YChannel:
             {
               sumFilter->AddInputData(YDifference[g-1].imagedata);
               break;
             }
-            case 1:
+            case IChannel:
             {
               sumFilter->AddInputData(IDifference[g-1].imagedata);
               break;
             }
-            case 2:
+            case QChannel:
             {
               sumFilter->AddInputData(QDifference[g-1].imagedata);
               break;
@@ -625,16 +522,16 @@ int main(int argc, char* argv[])
           {
             switch (j)
             {
-              case 0:
+              case YChannel:
               {
                 FrameDifferenceY->ShallowCopy(sumFilter->GetOutput());
               }
-              case 1:
+              case IChannel:
               {
                 FrameDifferenceI->ShallowCopy(sumFilter->GetOutput());
                 break;
               }
-              case 2:
+              case QChannel:
               {
                 FrameDifferenceQ->ShallowCopy(sumFilter->GetOutput());
                 break;
@@ -655,14 +552,14 @@ int main(int argc, char* argv[])
         switch(j)
         {
           // Do nothing for Y channel
-          case 1:
+          case IChannel:
           {
             chromaticCorrection->SetInput1Data(FrameDifferenceI);
             chromaticCorrection->Update();
             FrameDifferenceI->ShallowCopy(chromaticCorrection->GetOutput());
             break;
           }
-          case 2:
+          case QChannel:
           {
             chromaticCorrection->SetInput1Data(FrameDifferenceQ);
             chromaticCorrection->Update();
@@ -678,7 +575,7 @@ int main(int argc, char* argv[])
         addDifferenceOrigFrameFilter->SetWeight(1,.5);
         // addDifferenceOrigFrameFilter->SetInputData(imageSource->GetOutput());
         switch (j) {
-          case 0:
+          case YChannel:
           {
             addDifferenceOrigFrameFilter->SetInputData(extractYFilter->GetOutput());
             addDifferenceOrigFrameFilter->AddInputData(FrameDifferenceY);
@@ -686,7 +583,7 @@ int main(int argc, char* argv[])
             OutputFrameY->ShallowCopy(addDifferenceOrigFrameFilter->GetOutput());
             break;
           }
-          case 1:
+          case IChannel:
           {
             addDifferenceOrigFrameFilter->SetInputData(extractIFilter->GetOutput());
             addDifferenceOrigFrameFilter->AddInputData(FrameDifferenceI);
@@ -694,7 +591,7 @@ int main(int argc, char* argv[])
             OutputFrameI->ShallowCopy(addDifferenceOrigFrameFilter->GetOutput());
             break;
           }
-          case 2:
+          case QChannel:
           {
             addDifferenceOrigFrameFilter->SetInputData(extractQFilter->GetOutput());
             addDifferenceOrigFrameFilter->AddInputData(FrameDifferenceQ);
@@ -737,7 +634,7 @@ int main(int argc, char* argv[])
       writeDifferenceFrames->SetInputData(rgbConversionFilter->GetOutput());
       writeDifferenceFrames->Write();
     }
-    
+
   // --------Use the code below to visualise the frames instead of writing the frames to disk---------
 
   // vtkSmartPointer<vtkDataSetMapper> mapper =
