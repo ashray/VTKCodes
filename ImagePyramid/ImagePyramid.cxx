@@ -68,8 +68,7 @@ class imageStruct
 // -------Variables used in IIR(Infinite impulse response) magnification of the video-----
 int alpha = 10;
 int lambda_c = 16;
-float delta;
-delta = lambda_c/8/(1+alpha);
+float delta = lambda_c/8/(1+alpha);
 //exaggeration_factor HAS to be a user defined constant, above values could be hardcoded as well, preferrably not
 int exaggeration_factor = 60;
 // ---------------------------------------------------------------------------------------
@@ -78,6 +77,8 @@ int exaggeration_factor = 60;
 float r1 = 0.4;
 float r2 = 0.05;
 // ---------------------------------------------------------------------------------------
+
+double chromatic_abberation = 1; //User given input
 
 int main(int argc, char* argv[])
 {
@@ -116,7 +117,8 @@ int main(int argc, char* argv[])
 
 
   int frameSize[NumberOfPyramidLevels];
-  std::string directoryName = "/Users/ashraymalhotra/Desktop/Academic/VTKDev/Data/AllImages/";
+  // std::string directoryName = "/Users/ashraymalhotra/Desktop/Academic/VTKDev/Data/AllImages/";
+  std::string directoryName = "/Users/ashraymalhotra/Desktop/Academic/VTKDev/Data/ImageSequence/";
 
   // Create reader to read all images
   std::string dirString = directoryName;
@@ -164,8 +166,8 @@ int main(int argc, char* argv[])
     //-------------------------------------------------------------------------
 
     int NumberOfPyramidLevels = 6;
-    for (int j=0; j<3; j++){
-      switch (j){
+    for (int color_channel=0; color_channel<3; color_channel++){
+      switch (color_channel){
         case YChannel:
           imageSource = extractYFilter;
           break;
@@ -204,7 +206,7 @@ int main(int argc, char* argv[])
       // ------------------Image Pyramid construction complete--------------
 
       // -------------Copy Image Pyramid into corresponding variable-------
-      switch (j){
+      switch (color_channel){
         case YChannel:
           {
             for (int k=0; k<NumberOfPyramidLevels; k++)
@@ -237,7 +239,7 @@ int main(int argc, char* argv[])
       // Initialising the Previous frame pyramid for frame 1. We initialise it to the first frame(which means first value of frame difference is going to be zero)
       if (ImageNumber==0)
       {
-        switch (j)
+        switch (color_channel)
         {
           case YChannel:
           {
@@ -279,7 +281,7 @@ int main(int argc, char* argv[])
         sumFilter1->SetWeight(1,(1-r1));
         sumFilter2->SetWeight(0,r2);
         sumFilter2->SetWeight(1,(1-r2));
-        switch (j)
+        switch (color_channel)
         {
           case YChannel:
           {
@@ -337,7 +339,7 @@ int main(int argc, char* argv[])
         differenceFilter->SetThreshold(0);
         vtkSmartPointer<vtkImageMathematics> imageMath = vtkSmartPointer<vtkImageMathematics>::New();
         imageMath->SetOperationToSubtract();
-        switch(j)
+        switch(color_channel)
         {
           case YChannel:
           {
@@ -390,7 +392,7 @@ int main(int argc, char* argv[])
         vtkSmartPointer<vtkImageMathematics> differenceBooster = vtkSmartPointer<vtkImageMathematics>::New();
         differenceBooster->SetOperationToMultiplyByK();
 
-        switch(j)
+        switch(color_channel)
         {
           case YChannel:
           {
@@ -464,7 +466,7 @@ int main(int argc, char* argv[])
         {
           if (g == (NumberOfPyramidLevels-1))
           {
-            switch (j) {
+            switch (color_channel) {
               case YChannel:
               {
                 resize->SetInputData(YDifference[g].imagedata);
@@ -498,7 +500,7 @@ int main(int argc, char* argv[])
           gaussianSmoothFilter->SetInputData(resize->GetOutput());
           gaussianSmoothFilter->Update();
           sumFilter->SetInputData(gaussianSmoothFilter->GetOutput());
-          switch (j) {
+          switch (color_channel) {
             case YChannel:
             {
               sumFilter->AddInputData(YDifference[g-1].imagedata);
@@ -520,7 +522,7 @@ int main(int argc, char* argv[])
           // --------------Save the final image in corresponding difference variable---------
           if (g==1)
           {
-            switch (j)
+            switch (color_channel)
             {
               case YChannel:
               {
@@ -544,12 +546,11 @@ int main(int argc, char* argv[])
 
 
         //----------Chromatic Abberation to reduce noise---------------
-        double chromatic_abberation = 0.1; //User given input
         vtkSmartPointer<vtkImageMathematics> chromaticCorrection =
           vtkSmartPointer<vtkImageMathematics>::New();
         chromaticCorrection->SetOperationToMultiplyByK();
         chromaticCorrection->SetConstantK(chromatic_abberation);
-        switch(j)
+        switch(color_channel)
         {
           // Do nothing for Y channel
           case IChannel:
@@ -574,7 +575,7 @@ int main(int argc, char* argv[])
         addDifferenceOrigFrameFilter->SetWeight(0,.5);
         addDifferenceOrigFrameFilter->SetWeight(1,.5);
         // addDifferenceOrigFrameFilter->SetInputData(imageSource->GetOutput());
-        switch (j) {
+        switch (color_channel) {
           case YChannel:
           {
             addDifferenceOrigFrameFilter->SetInputData(extractYFilter->GetOutput());
