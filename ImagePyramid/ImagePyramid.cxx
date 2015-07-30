@@ -58,21 +58,34 @@ std::string showDims (vtkImageData *img)
 // Originally defined as struct, hence the improper naming.
 class ImageStruct
 {
-  public:
+public:
   ImageStruct() { this->imagedata = vtkSmartPointer<vtkImageData>::New(); }
   ~ImageStruct() { this->imagedata = NULL; } // Assigning VTK Smart pointer to null deletes it
   vtkSmartPointer<vtkImageData> imagedata;
 };
 
-class ImagePyramid
+class vtkImagePyramid: public vtkObjectBase
 {
+public:
+  std::vector<vtkSmartPointer<vtkImageData> > vtkImagePyramidData;
 
-  public:
-  std::vector<vtkSmartPointer<vtkImageData> > imagePyramidData;
-  ImagePyramid(vtkImageData *img) {
-    ImagePyramid(img, 6); // Default pyramid level count=6
+  void ShallowCopy(vtkImagePyramid *imp) // Let's keep this short. Heh! :)
+  {
+    this->vtkImagePyramidData.clear();
+    this->vtkImagePyramidData.resize(imp->vtkImagePyramidData.size()); // Not strictly necessary
+    for(size_t i = 0; i != imp->vtkImagePyramidData.size(); ++i) {
+      this->vtkImagePyramidData[i]->ShallowCopy(imp->vtkImagePyramidData[i]);
+    }
   }
-  ImagePyramid(vtkImageData *img, int PyramidLevelCount)
+
+  vtkImagePyramid();
+  vtkImagePyramid(int levels) {
+    this->vtkImagePyramidData.resize(levels);
+  }
+  vtkImagePyramid(vtkImageData *img) {
+    vtkImagePyramid(img, 6); // Default PyramidLevelCount=6
+  }
+  vtkImagePyramid(vtkImageData *img, int PyramidLevelCount)
   {
 
     vtkSmartPointer<vtkImageGaussianSmooth> gaussianSmoothFilter;
@@ -80,10 +93,10 @@ class ImagePyramid
     int *imageDimensionArray = img->GetExtent();
     int imageDimension1 = imageDimensionArray[1] - imageDimensionArray[0] + 1;
     int imageDimension2 = imageDimensionArray[3] - imageDimensionArray[2] + 1;
-    imagePyramidData.push_back(img);
+    vtkImagePyramidData.push_back(img);
     for (int i=1; i<PyramidLevelCount; i++){
       gaussianSmoothFilter = vtkSmartPointer<vtkImageGaussianSmooth>::New();
-      gaussianSmoothFilter->SetInputData(imagePyramidData[i-1]);
+      gaussianSmoothFilter->SetInputData(vtkImagePyramidData[i-1]);
       gaussianSmoothFilter->Update();
       // Need to take care of gaussian pyramid variance
       resize = vtkSmartPointer<vtkImageResize>::New();
@@ -91,11 +104,11 @@ class ImagePyramid
       resize->SetInputData(gaussianSmoothFilter->GetOutput());
       resize->SetOutputDimensions(imageDimension1/(pow(2,i)), imageDimension2/(pow(2,i)), 1);
       resize->Update();
-      imagePyramidData.push_back(resize->GetOutput());
+      vtkImagePyramidData.push_back(resize->GetOutput());
     }
   }
 
-  ~ImagePyramid() {;}// TODO - Complete the destructor
+  ~vtkImagePyramid() {;}// TODO - Complete the destructor
 };
 
 
@@ -114,27 +127,26 @@ float r2 = 0.05;
 // ---------------------------------------------------------------------------------------
 
 double chromatic_abberation = 0.1; //User given input
+int NumberOfPyramidLevels = 6;  // User choice, prefer to keep the default to 6.
 
 int main(int argc, char* argv[])
 {
 
   // Have to define these variables as global since used in mapper, can be optimised better
-  int NumberOfPyramidLevels = 6;
-  ImageStruct *imagePyramidGeneral = new ImageStruct[NumberOfPyramidLevels];
-  ImageStruct *YPyramid = new ImageStruct[NumberOfPyramidLevels];
-  ImageStruct *IPyramid = new ImageStruct[NumberOfPyramidLevels];
-  ImageStruct *QPyramid = new ImageStruct[NumberOfPyramidLevels];
+  vtkSmartPointer<vtkImagePyramid> YPyramid;
+  vtkSmartPointer<vtkImagePyramid> IPyramid;
+  vtkSmartPointer<vtkImagePyramid> QPyramid;
 
-  ImageStruct *YDifference = new ImageStruct[NumberOfPyramidLevels];
-  ImageStruct *IDifference = new ImageStruct[NumberOfPyramidLevels];
-  ImageStruct *QDifference = new ImageStruct[NumberOfPyramidLevels];
+  vtkSmartPointer<vtkImagePyramid> lowPass1Y;
+  vtkSmartPointer<vtkImagePyramid> lowPass2Y;
+  vtkSmartPointer<vtkImagePyramid> lowPass1I;
+  vtkSmartPointer<vtkImagePyramid> lowPass2I;
+  vtkSmartPointer<vtkImagePyramid> lowPass1Q;
+  vtkSmartPointer<vtkImagePyramid> lowPass2Q;
 
-  ImageStruct *lowPass1Y = new ImageStruct[NumberOfPyramidLevels];
-  ImageStruct *lowPass2Y = new ImageStruct[NumberOfPyramidLevels];
-  ImageStruct *lowPass1I = new ImageStruct[NumberOfPyramidLevels];
-  ImageStruct *lowPass2I = new ImageStruct[NumberOfPyramidLevels];
-  ImageStruct *lowPass1Q = new ImageStruct[NumberOfPyramidLevels];
-  ImageStruct *lowPass2Q = new ImageStruct[NumberOfPyramidLevels];
+  vtkSmartPointer<vtkImagePyramid> YDifference;
+  vtkSmartPointer<vtkImagePyramid> IDifference;
+  vtkSmartPointer<vtkImagePyramid> QDifference;
 
   vtkSmartPointer<vtkImageData> FrameDifferenceY = vtkSmartPointer<vtkImageData>::New();
   vtkSmartPointer<vtkImageData> FrameDifferenceI = vtkSmartPointer<vtkImageData>::New();
@@ -200,41 +212,7 @@ int main(int argc, char* argv[])
     extractQFilter->Update();
     //-------------------------------------------------------------------------
 
-    int NumberOfPyramidLevels = 6;
     for (int color_channel=0; color_channel<3; color_channel++){
-      switch (color_channel){
-        case YChannel:
-          imageSource = extractYFilter;
-          break;
-        case IChannel:
-          imageSource = extractIFilter;
-          break;
-        case QChannel:
-          imageSource = extractQFilter;
-          break;
-      }
-
-      // ---------------------Image Pyramid Construction---------------------
-      vtkSmartPointer<vtkImageGaussianSmooth> gaussianSmoothFilter;
-      vtkSmartPointer<vtkImageResize> resize;
-
-      imagePyramidGeneral[0].imagedata->ShallowCopy(imageSource->GetOutput());
-
-      for (int i=1; i<NumberOfPyramidLevels; i++){
-        gaussianSmoothFilter = vtkSmartPointer<vtkImageGaussianSmooth>::New();
-        gaussianSmoothFilter->SetInputData(imagePyramidGeneral[i-1].imagedata);
-        gaussianSmoothFilter->Update();
-
-        // Need to take care of gaussian pyramid variance
-
-        resize = vtkSmartPointer<vtkImageResize>::New();
-        resize->SetResizeMethodToOutputDimensions();
-        resize->SetInputData(gaussianSmoothFilter->GetOutput());
-        resize->SetOutputDimensions(imageDimension1/(pow(2,i)), imageDimension2/(pow(2,i)), 1);
-        resize->Update();
-        imagePyramidGeneral[i].imagedata->ShallowCopy(resize->GetOutput());
-      }
-      // ------------------Image Pyramid construction complete--------------
 
       // -------------Copy Image Pyramid into corresponding variable-------
       switch (color_channel){
@@ -242,7 +220,7 @@ int main(int argc, char* argv[])
           {
             for (int k=0; k<NumberOfPyramidLevels; k++)
             {
-              YPyramid[k].imagedata->ShallowCopy(imagePyramidGeneral[k].imagedata);
+              YPyramid = new vtkImagePyramid(extractYFilter->GetOutput(), NumberOfPyramidLevels);
             }
             break;
           }
@@ -250,7 +228,7 @@ int main(int argc, char* argv[])
           {
             for (int k=0; k<NumberOfPyramidLevels; k++)
             {
-              IPyramid[k].imagedata->ShallowCopy(imagePyramidGeneral[k].imagedata);
+              IPyramid = new vtkImagePyramid(extractIFilter->GetOutput(), NumberOfPyramidLevels);
             }
             break;
           }
@@ -258,7 +236,7 @@ int main(int argc, char* argv[])
           {
             for (int k=0; k<NumberOfPyramidLevels; k++)
             {
-              QPyramid[k].imagedata->ShallowCopy(imagePyramidGeneral[k].imagedata);
+              QPyramid = new vtkImagePyramid(extractQFilter->GetOutput(), NumberOfPyramidLevels);
             }
             break;
           }
@@ -274,34 +252,39 @@ int main(int argc, char* argv[])
         {
           case YChannel:
           {
-            //Make the code below in a seperate function to copy image pyramids
+            lowPass1Y = new vtkImagePyramid(NumberOfPyramidLevels);
+            lowPass2Y = new vtkImagePyramid(NumberOfPyramidLevels);
             for (int k=0; k<NumberOfPyramidLevels; k++)
             {
-              lowPass1Y[k].imagedata->ShallowCopy(YPyramid[k].imagedata);
-              lowPass2Y[k].imagedata->ShallowCopy(YPyramid[k].imagedata);
+              lowPass1Y->vtkImagePyramidData[k]->ShallowCopy(YPyramid->vtkImagePyramidData[k]);
+              lowPass2Y->vtkImagePyramidData[k]->ShallowCopy(YPyramid->vtkImagePyramidData[k]);
             }
             break;
           }
           case IChannel:
           {
+            lowPass1I = new vtkImagePyramid(NumberOfPyramidLevels);
+            lowPass2I = new vtkImagePyramid(NumberOfPyramidLevels);
             for (int k=0; k<NumberOfPyramidLevels; k++)
             {
-              lowPass1I[k].imagedata->ShallowCopy(IPyramid[k].imagedata);
-              lowPass2I[k].imagedata->ShallowCopy(IPyramid[k].imagedata);
+              lowPass1I->vtkImagePyramidData[k]->ShallowCopy(IPyramid->vtkImagePyramidData[k]);
+              lowPass2I->vtkImagePyramidData[k]->ShallowCopy(IPyramid->vtkImagePyramidData[k]);
             }
             break;
           }
           case QChannel:
           {
+            lowPass1Q = new vtkImagePyramid(NumberOfPyramidLevels);
+            lowPass2Q = new vtkImagePyramid(NumberOfPyramidLevels);
             for (int k=0; k<NumberOfPyramidLevels; k++)
             {
-              lowPass1Q[k].imagedata->ShallowCopy(QPyramid[k].imagedata);
-              lowPass2Q[k].imagedata->ShallowCopy(QPyramid[k].imagedata);
+              lowPass1Q->vtkImagePyramidData[k]->ShallowCopy(QPyramid->vtkImagePyramidData[k]);
+              lowPass2Q->vtkImagePyramidData[k]->ShallowCopy(QPyramid->vtkImagePyramidData[k]);
             }
             break;
           }
         }
-      } //--------------------------------------------------------------------
+      }
       else
       {
         //---------Temporal IIR(Infinite impulse response) filtering-----------
@@ -318,14 +301,14 @@ int main(int argc, char* argv[])
           {
             for (int k=0; k<NumberOfPyramidLevels; k++)
             {
-              sumFilter1->SetInputData(YPyramid[k].imagedata);
-              sumFilter1->AddInputData(lowPass1Y[k].imagedata);
+              sumFilter1->SetInputData(YPyramid->vtkImagePyramidData[k]);
+              sumFilter1->AddInputData(lowPass1Y->vtkImagePyramidData[k]);
               sumFilter1->Update();
-              lowPass1Y[k].imagedata->ShallowCopy(sumFilter1->GetOutput());
-              sumFilter2->SetInputData(YPyramid[k].imagedata);
-              sumFilter2->AddInputData(lowPass2Y[k].imagedata);
+              lowPass1Y->vtkImagePyramidData[k]->ShallowCopy(sumFilter1->GetOutput());
+              sumFilter2->SetInputData(YPyramid->vtkImagePyramidData[k]);
+              sumFilter2->AddInputData(lowPass2Y->vtkImagePyramidData[k]);
               sumFilter2->Update();
-              lowPass2Y[k].imagedata->ShallowCopy(sumFilter2->GetOutput());
+              lowPass2Y->vtkImagePyramidData[k]->ShallowCopy(sumFilter2->GetOutput());
             }
             break;
           }
@@ -333,14 +316,14 @@ int main(int argc, char* argv[])
           {
             for (int k=0; k<NumberOfPyramidLevels; k++)
             {
-              sumFilter1->SetInputData(IPyramid[k].imagedata);
-              sumFilter1->AddInputData(lowPass1I[k].imagedata);
+              sumFilter1->SetInputData(IPyramid->vtkImagePyramidData[k]);
+              sumFilter1->AddInputData(lowPass1I->vtkImagePyramidData[k]);
               sumFilter1->Update();
-              lowPass1I[k].imagedata->ShallowCopy(sumFilter1->GetOutput());
-              sumFilter2->SetInputData(IPyramid[k].imagedata);
-              sumFilter2->AddInputData(lowPass2I[k].imagedata);
+              lowPass1I->vtkImagePyramidData[k]->ShallowCopy(sumFilter1->GetOutput());
+              sumFilter2->SetInputData(IPyramid->vtkImagePyramidData[k]);
+              sumFilter2->AddInputData(lowPass2I->vtkImagePyramidData[k]);
               sumFilter2->Update();
-              lowPass2I[k].imagedata->ShallowCopy(sumFilter2->GetOutput());
+              lowPass2I->vtkImagePyramidData[k]->ShallowCopy(sumFilter2->GetOutput());
             }
             break;
           }
@@ -348,14 +331,14 @@ int main(int argc, char* argv[])
           {
             for (int k=0; k<NumberOfPyramidLevels; k++)
             {
-              sumFilter1->SetInputData(QPyramid[k].imagedata);
-              sumFilter1->AddInputData(lowPass1Q[k].imagedata);
+              sumFilter1->SetInputData(QPyramid->vtkImagePyramidData[k]);
+              sumFilter1->AddInputData(lowPass1Q->vtkImagePyramidData[k]);
               sumFilter1->Update();
-              lowPass1Q[k].imagedata->ShallowCopy(sumFilter1->GetOutput());
-              sumFilter2->SetInputData(QPyramid[k].imagedata);
-              sumFilter2->AddInputData(lowPass2Q[k].imagedata);
+              lowPass1Q->vtkImagePyramidData[k]->ShallowCopy(sumFilter1->GetOutput());
+              sumFilter2->SetInputData(QPyramid->vtkImagePyramidData[k]);
+              sumFilter2->AddInputData(lowPass2Q->vtkImagePyramidData[k]);
               sumFilter2->Update();
-              lowPass2Q[k].imagedata->ShallowCopy(sumFilter2->GetOutput());
+              lowPass2Q->vtkImagePyramidData[k]->ShallowCopy(sumFilter2->GetOutput());
             }
             break;
           }
@@ -369,6 +352,9 @@ int main(int argc, char* argv[])
         differenceFilter->SetAllowShift(0);
         differenceFilter->SetThreshold(0);
         vtkSmartPointer<vtkImageMathematics> imageMath = vtkSmartPointer<vtkImageMathematics>::New();
+        YDifference = new vtkImagePyramid(lowPass1Y->vtkImagePyramidData[0], NumberOfPyramidLevels);
+        IDifference = new vtkImagePyramid(lowPass1I->vtkImagePyramidData[0], NumberOfPyramidLevels);
+        QDifference = new vtkImagePyramid(lowPass1Q->vtkImagePyramidData[0], NumberOfPyramidLevels);
         imageMath->SetOperationToSubtract();
         switch(color_channel)
         {
@@ -376,10 +362,10 @@ int main(int argc, char* argv[])
           {
             for (int k=0; k<NumberOfPyramidLevels; k++)
             {
-              imageMath->SetInput1Data(lowPass1Y[k].imagedata);
-              imageMath->SetInput2Data(lowPass2Y[k].imagedata);
+              imageMath->SetInput1Data(lowPass1Y->vtkImagePyramidData[k]);
+              imageMath->SetInput2Data(lowPass2Y->vtkImagePyramidData[k]);
               imageMath->Update();
-              YDifference[k].imagedata->ShallowCopy(imageMath->GetOutput());
+              YDifference->vtkImagePyramidData[k]->ShallowCopy(imageMath->GetOutput());
             }
             break;
           }
@@ -387,10 +373,10 @@ int main(int argc, char* argv[])
           {
             for (int k=0; k<NumberOfPyramidLevels; k++)
             {
-              imageMath->SetInput1Data(lowPass1I[k].imagedata);
-              imageMath->SetInput2Data(lowPass2I[k].imagedata);
+              imageMath->SetInput1Data(lowPass1I->vtkImagePyramidData[k]);
+              imageMath->SetInput2Data(lowPass2I->vtkImagePyramidData[k]);
               imageMath->Update();
-              IDifference[k].imagedata->ShallowCopy(imageMath->GetOutput());
+              IDifference->vtkImagePyramidData[k]->ShallowCopy(imageMath->GetOutput());
             }
             break;
           }
@@ -398,10 +384,10 @@ int main(int argc, char* argv[])
           {
             for (int k=0; k<NumberOfPyramidLevels; k++)
             {
-              imageMath->SetInput1Data(lowPass1Q[k].imagedata);
-              imageMath->SetInput2Data(lowPass2Q[k].imagedata);
+              imageMath->SetInput1Data(lowPass1Q->vtkImagePyramidData[k]);
+              imageMath->SetInput2Data(lowPass2Q->vtkImagePyramidData[k]);
               imageMath->Update();
-              QDifference[k].imagedata->ShallowCopy(imageMath->GetOutput());
+              QDifference->vtkImagePyramidData[k]->ShallowCopy(imageMath->GetOutput());
             }
             break;
           }
@@ -412,7 +398,7 @@ int main(int argc, char* argv[])
       // ----------------Get image dimensions for spatial filtering------------
         for (int k=0; k<NumberOfPyramidLevels; k++)
         {
-          int* a = lowPass1Q[k].imagedata->GetExtent();
+          int* a = lowPass1Q->vtkImagePyramidData[k]->GetExtent();
           int imageDimension1 = a[1] - a[0] + 1;
           int imageDimension2 = a[3] - a[2] + 1;
           frameSize[k] = pow((pow(imageDimension1,2) + pow(imageDimension2,2)), 0.5)/3;
@@ -438,9 +424,9 @@ int main(int argc, char* argv[])
               }
               // ----------Verify that multiplier is a float(or acceptable data format for SetConstantK)--------
               differenceBooster->SetConstantK(mutiplier);
-              differenceBooster->SetInput1Data(YDifference[k].imagedata);
+              differenceBooster->SetInput1Data(YDifference->vtkImagePyramidData[k]);
               differenceBooster->Update();
-              YDifference[k].imagedata->ShallowCopy(differenceBooster->GetOutput());
+              YDifference->vtkImagePyramidData[k]->ShallowCopy(differenceBooster->GetOutput());
             }
             break;
           }
@@ -456,9 +442,9 @@ int main(int argc, char* argv[])
                 mutiplier = alpha;
               }
               differenceBooster->SetConstantK(mutiplier);
-              differenceBooster->SetInput1Data(IDifference[k].imagedata);
+              differenceBooster->SetInput1Data(IDifference->vtkImagePyramidData[k]);
               differenceBooster->Update();
-              IDifference[k].imagedata->ShallowCopy(differenceBooster->GetOutput());
+              IDifference->vtkImagePyramidData[k]->ShallowCopy(differenceBooster->GetOutput());
             }
             break;
           }
@@ -474,9 +460,9 @@ int main(int argc, char* argv[])
                 mutiplier = alpha;
               }
               differenceBooster->SetConstantK(mutiplier);
-              differenceBooster->SetInput1Data(QDifference[k].imagedata);
+              differenceBooster->SetInput1Data(QDifference->vtkImagePyramidData[k]);
               differenceBooster->Update();
-              QDifference[k].imagedata->ShallowCopy(differenceBooster->GetOutput());
+              QDifference->vtkImagePyramidData[k]->ShallowCopy(differenceBooster->GetOutput());
             }
             break;
           }
@@ -487,6 +473,8 @@ int main(int argc, char* argv[])
         //-----------Collapse the image Pyramid------------------------
 
         // Verify that the algorithm to implement the laplacian pyramid is correct
+        vtkSmartPointer<vtkImageGaussianSmooth> gaussianSmoothFilter;
+        vtkSmartPointer<vtkImageResize> resize;
         resize = vtkSmartPointer<vtkImageResize>::New();
         gaussianSmoothFilter = vtkSmartPointer<vtkImageGaussianSmooth>::New();
         vtkSmartPointer<vtkImageWeightedSum> sumFilter = vtkSmartPointer<vtkImageWeightedSum>::New();
@@ -500,17 +488,17 @@ int main(int argc, char* argv[])
             switch (color_channel) {
               case YChannel:
               {
-                resize->SetInputData(YDifference[g].imagedata);
+                resize->SetInputData(YDifference->vtkImagePyramidData[g]);
                 break;
               }
               case IChannel:
               {
-                resize->SetInputData(IDifference[g].imagedata);
+                resize->SetInputData(IDifference->vtkImagePyramidData[g]);
                 break;
               }
               case QChannel:
               {
-                resize->SetInputData(QDifference[g].imagedata);
+                resize->SetInputData(QDifference->vtkImagePyramidData[g]);
                 break;
               }
             }
@@ -534,17 +522,17 @@ int main(int argc, char* argv[])
           switch (color_channel) {
             case YChannel:
             {
-              sumFilter->AddInputData(YDifference[g-1].imagedata);
+              sumFilter->AddInputData(YDifference->vtkImagePyramidData[g-1]);
               break;
             }
             case IChannel:
             {
-              sumFilter->AddInputData(IDifference[g-1].imagedata);
+              sumFilter->AddInputData(IDifference->vtkImagePyramidData[g-1]);
               break;
             }
             case QChannel:
             {
-              sumFilter->AddInputData(QDifference[g-1].imagedata);
+              sumFilter->AddInputData(QDifference->vtkImagePyramidData[g-1]);
               break;
             }
           }
@@ -675,7 +663,7 @@ int main(int argc, char* argv[])
   // // mapper->SetInputConnection(resize->GetOutputPort());
   //
   // //-------------------Suspected code snippet causing segmentation error----------------------------
-  // // Why does mapper->SetInputData(imagePyramidGeneral[0].imagedata);  throw up an error?
+  // // Why does mapper->SetInputData(ImagePyramidGeneral[0].imagedata);  throw up an error?
   // // mapper->SetInputData(YDifference[0].imagedata);
   // mapper->SetInputData(rgbConversionFilter->GetOutput());
   //   // mapper->SetInputData(differenceFilter->GetOutput);
