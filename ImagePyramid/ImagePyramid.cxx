@@ -363,9 +363,9 @@ int main(int argc, char* argv[])
         differenceFilter->SetAllowShift(0);
         differenceFilter->SetThreshold(0);
         vtkSmartPointer<vtkImageMathematics> imageMath = vtkSmartPointer<vtkImageMathematics>::New();
-        YDifference = new vtkImagePyramid(lowPass1Y->vtkImagePyramidData[0], NumberOfPyramidLevels);
-        IDifference = new vtkImagePyramid(lowPass1I->vtkImagePyramidData[0], NumberOfPyramidLevels);
-        QDifference = new vtkImagePyramid(lowPass1Q->vtkImagePyramidData[0], NumberOfPyramidLevels);
+        YDifference = new vtkImagePyramid(NumberOfPyramidLevels);
+        IDifference = new vtkImagePyramid(NumberOfPyramidLevels);
+        QDifference = new vtkImagePyramid(NumberOfPyramidLevels);
         imageMath->SetOperationToSubtract();
         switch(color_channel)
         {
