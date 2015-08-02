@@ -2,6 +2,14 @@
 #define IChannel 1
 #define QChannel 2
 
+// #define debug
+
+#ifdef debug
+#define DEBUG printf("line number %d\n", __LINE__);
+#else
+#define DEBUG
+#endif
+
 #include <vtkSmartPointer.h>
 #include <vtkProperty.h>
 #include <vtkDataSetMapper.h>
@@ -56,13 +64,13 @@ std::string showDims (vtkImageData *img)
 }
 
 // Originally defined as struct, hence the improper naming.
-class ImageStruct
-{
-public:
-  ImageStruct() { this->imagedata = vtkSmartPointer<vtkImageData>::New(); }
-  ~ImageStruct() { this->imagedata = NULL; } // Assigning VTK Smart pointer to null deletes it
-  vtkSmartPointer<vtkImageData> imagedata;
-};
+// class ImageStruct
+// {
+// public:
+//   ImageStruct() { this->imagedata = vtkSmartPointer<vtkImageData>::New(); }
+//   ~ImageStruct() { this->imagedata = NULL; } // Assigning VTK Smart pointer to null deletes it
+//   vtkSmartPointer<vtkImageData> imagedata;
+// };
 
 class vtkImagePyramid: public vtkObjectBase
 {
@@ -74,13 +82,19 @@ public:
     this->vtkImagePyramidData.clear();
     this->vtkImagePyramidData.resize(imp->vtkImagePyramidData.size()); // Not strictly necessary
     for(size_t i = 0; i != imp->vtkImagePyramidData.size(); ++i) {
+      DEBUG
+      this->vtkImagePyramidData[i] = vtkSmartPointer<vtkImageData>::New();
       this->vtkImagePyramidData[i]->ShallowCopy(imp->vtkImagePyramidData[i]);
+      DEBUG
     }
   }
 
-  vtkImagePyramid();
+  vtkImagePyramid(){};
   vtkImagePyramid(int levels) {
     this->vtkImagePyramidData.resize(levels);
+    for(size_t i = 0; i < levels; ++i) {
+      this->vtkImagePyramidData[i] = vtkSmartPointer<vtkImageData>::New();
+    }
   }
   vtkImagePyramid(vtkImageData *img) {
     vtkImagePyramid(img, 6); // Default PyramidLevelCount=6
@@ -131,7 +145,6 @@ int NumberOfPyramidLevels = 6;  // User choice, prefer to keep the default to 6.
 
 int main(int argc, char* argv[])
 {
-
   // Have to define these variables as global since used in mapper, can be optimised better
   vtkSmartPointer<vtkImagePyramid> YPyramid;
   vtkSmartPointer<vtkImagePyramid> IPyramid;
@@ -212,6 +225,8 @@ int main(int argc, char* argv[])
     extractQFilter->Update();
     //-------------------------------------------------------------------------
 
+    DEBUG
+
     for (int color_channel=0; color_channel<3; color_channel++){
 
       // -------------Copy Image Pyramid into corresponding variable-------
@@ -243,7 +258,7 @@ int main(int argc, char* argv[])
       }
       // --------Copied image pyramid into corresponding variable-------------
 
-
+      DEBUG
       // -------------initialising lowPass with first frame--------------------------
       // Initialising the Previous frame pyramid for frame 1. We initialise it to the first frame(which means first value of frame difference is going to be zero)
       if (ImageNumber==0)
@@ -252,35 +267,29 @@ int main(int argc, char* argv[])
         {
           case YChannel:
           {
-            lowPass1Y = new vtkImagePyramid(NumberOfPyramidLevels);
-            lowPass2Y = new vtkImagePyramid(NumberOfPyramidLevels);
-            for (int k=0; k<NumberOfPyramidLevels; k++)
-            {
-              lowPass1Y->vtkImagePyramidData[k]->ShallowCopy(YPyramid->vtkImagePyramidData[k]);
-              lowPass2Y->vtkImagePyramidData[k]->ShallowCopy(YPyramid->vtkImagePyramidData[k]);
-            }
+            DEBUG
+            lowPass1Y = new vtkImagePyramid();
+            lowPass2Y = new vtkImagePyramid();
+            lowPass1Y->ShallowCopy(YPyramid);
+            lowPass2Y->ShallowCopy(YPyramid);
             break;
           }
           case IChannel:
           {
-            lowPass1I = new vtkImagePyramid(NumberOfPyramidLevels);
-            lowPass2I = new vtkImagePyramid(NumberOfPyramidLevels);
-            for (int k=0; k<NumberOfPyramidLevels; k++)
-            {
-              lowPass1I->vtkImagePyramidData[k]->ShallowCopy(IPyramid->vtkImagePyramidData[k]);
-              lowPass2I->vtkImagePyramidData[k]->ShallowCopy(IPyramid->vtkImagePyramidData[k]);
-            }
+            DEBUG
+            lowPass1I = new vtkImagePyramid();
+            lowPass2I = new vtkImagePyramid();
+            lowPass1I->ShallowCopy(IPyramid);
+            lowPass2I->ShallowCopy(IPyramid);
             break;
           }
           case QChannel:
           {
-            lowPass1Q = new vtkImagePyramid(NumberOfPyramidLevels);
-            lowPass2Q = new vtkImagePyramid(NumberOfPyramidLevels);
-            for (int k=0; k<NumberOfPyramidLevels; k++)
-            {
-              lowPass1Q->vtkImagePyramidData[k]->ShallowCopy(QPyramid->vtkImagePyramidData[k]);
-              lowPass2Q->vtkImagePyramidData[k]->ShallowCopy(QPyramid->vtkImagePyramidData[k]);
-            }
+            DEBUG
+            lowPass1Q = new vtkImagePyramid();
+            lowPass2Q = new vtkImagePyramid();
+            lowPass1Q->ShallowCopy(QPyramid);
+            lowPass2Q->ShallowCopy(QPyramid);
             break;
           }
         }
@@ -344,6 +353,8 @@ int main(int argc, char* argv[])
           }
         }
         //-----Updated lowpass variable-------
+
+
 
         //----Image Pyramid difference for IIR filtering-----
         vtkSmartPointer<vtkImageDifference> differenceFilter = vtkSmartPointer<vtkImageDifference>::New();
