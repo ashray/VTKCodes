@@ -163,7 +163,7 @@ int alpha = 10;
 int lambda_c = 16;
 float delta = lambda_c/(8*(1+alpha));
 //exaggeration_factor HAS to be a user defined constant, above values could be hardcoded as well, preferrably not
-int exaggeration_factor = 60;
+int exaggeration_factor = 200;
 // ---------------------------------------------------------------------------------------
 
 // -------Spatial Filtering variables-----------
@@ -205,8 +205,8 @@ int main(int argc, char* argv[])
 
 
   int frameSize[NumberOfPyramidLevels];
-  std::string dirString = "/Users/ashraymalhotra/Desktop/Academic/VTKDev/Data/ImageSequence/";
-
+  // std::string dirString = "/Users/ashraymalhotra/Desktop/Academic/VTKDev/Data/ImageSequence/";
+  std::string dirString = "/Users/ashraymalhotra/Desktop/Academic/VTKDev/Data/AllImages/";
   // Create reader to read all images
   vtksys::SystemTools::ConvertToUnixSlashes(dirString);
   vtkSmartPointer<vtkGlobFileNames> glob = vtkSmartPointer<vtkGlobFileNames>::New();
@@ -628,6 +628,9 @@ int main(int argc, char* argv[])
         // Note that we might have to multiply the intensity with a factor of 2 later...
         addDifferenceOrigFrameFilter->SetWeight(0,.5);
         addDifferenceOrigFrameFilter->SetWeight(1,.5);
+        vtkSmartPointer<vtkImageMathematics> IntensityNormalisation = vtkSmartPointer<vtkImageMathematics>::New();
+        IntensityNormalisation->SetOperationToMultiplyByK();
+        IntensityNormalisation->SetConstantK(2);
         switch (color_channel) {
           case YChannel:
           {
@@ -635,6 +638,9 @@ int main(int argc, char* argv[])
             addDifferenceOrigFrameFilter->AddInputData(FrameDifferenceY);
             addDifferenceOrigFrameFilter->Update();
             OutputFrameY->ShallowCopy(addDifferenceOrigFrameFilter->GetOutput());
+            IntensityNormalisation->SetInput1Data(OutputFrameY);
+            IntensityNormalisation->Update();
+            OutputFrameY->ShallowCopy(IntensityNormalisation->GetOutput());
             break;
           }
           case IChannel:
@@ -643,6 +649,9 @@ int main(int argc, char* argv[])
             addDifferenceOrigFrameFilter->AddInputData(FrameDifferenceI);
             addDifferenceOrigFrameFilter->Update();
             OutputFrameI->ShallowCopy(addDifferenceOrigFrameFilter->GetOutput());
+            IntensityNormalisation->SetInput1Data(OutputFrameI);
+            IntensityNormalisation->Update();
+            OutputFrameI->ShallowCopy(IntensityNormalisation->GetOutput());
             break;
           }
           case QChannel:
@@ -651,6 +660,9 @@ int main(int argc, char* argv[])
             addDifferenceOrigFrameFilter->AddInputData(FrameDifferenceQ);
             addDifferenceOrigFrameFilter->Update();
             OutputFrameQ->ShallowCopy(addDifferenceOrigFrameFilter->GetOutput());
+            IntensityNormalisation->SetInput1Data(OutputFrameQ);
+            IntensityNormalisation->Update();
+            OutputFrameQ->ShallowCopy(IntensityNormalisation->GetOutput());
             break;
           }
         }
