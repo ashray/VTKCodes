@@ -2,7 +2,7 @@
 #define IChannel 1
 #define QChannel 2
 
-#define debug
+// #define debug
 
 #ifdef debug
 #define DEBUG printf("line number %d\n", __LINE__);
@@ -112,9 +112,6 @@ public:
     vtkImagePyramidData.push_back(img);
     for (int i=1; i<PyramidLevelCount; i++){
 
-      // gaussianSmoothFilter = vtkSmartPointer<vtkImageGaussianSmooth>::New();
-      // gaussianSmoothFilter->SetInputData(vtkImagePyramidData[i-1]);
-      // gaussianSmoothFilter->Update();
       vtkSmartPointer<vtkImageConvolve> convolveFilter =
         vtkSmartPointer<vtkImageConvolve>::New();
       convolveFilter->SetInputData(vtkImagePyramidData[i-1]);
@@ -126,14 +123,32 @@ public:
       convolveFilter->SetKernel5x5(kernel);
       convolveFilter->Update();
 
-      // Need to take care of gaussian pyramid variance
       resize = vtkSmartPointer<vtkImageResize>::New();
       resize->SetResizeMethodToOutputDimensions();
       resize->SetInputData(convolveFilter->GetOutput());
-      // resize->SetInputData(gaussianSmoothFilter->GetOutput());
       resize->SetOutputDimensions(imageDimension1/(pow(2,i)), imageDimension2/(pow(2,i)), 1);
       resize->Update();
+
       vtkImagePyramidData.push_back(resize->GetOutput());
+    }
+
+    for (int i=1; i<PyramidLevelCount-1; i++)
+    {
+      resize = vtkSmartPointer<vtkImageResize>::New();
+      resize->SetResizeMethodToOutputDimensions();
+      resize->SetInputData(vtkImagePyramidData[i+1]);
+      resize->SetOutputDimensions(imageDimension1/(pow(2,i)), imageDimension2/(pow(2,i)), 1);
+      resize->Update();
+      vtkSmartPointer<vtkImageDifference> differenceFilter2 =
+        vtkSmartPointer<vtkImageDifference>::New();
+      differenceFilter2->AllowShiftOff();
+      differenceFilter2->AveragingOff();
+      differenceFilter2->SetAllowShift(0);
+      differenceFilter2->SetThreshold(0);
+      differenceFilter2->SetInputData(vtkImagePyramidData[i]);
+      differenceFilter2->SetImageData(resize->GetOutput());
+      differenceFilter2->Update();
+      vtkImagePyramidData[i] = differenceFilter2->GetOutput();
     }
   }
 
