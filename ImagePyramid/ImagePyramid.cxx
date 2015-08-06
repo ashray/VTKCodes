@@ -2,7 +2,7 @@
 #define IChannel 1
 #define QChannel 2
 
-// #define debug
+#define debug
 
 #ifdef debug
 #define DEBUG printf("line number %d\n", __LINE__);
@@ -54,6 +54,8 @@
 #include <vtkImageAppendComponents.h>
 #include <vtkPNGWriter.h>
 
+#include <vtkImageConvolve.h>
+
 std::string showDims (vtkImageData *img)
 {
   std::ostringstream strm;
@@ -102,20 +104,33 @@ public:
   vtkImagePyramid(vtkImageData *img, int PyramidLevelCount)
   {
 
-    vtkSmartPointer<vtkImageGaussianSmooth> gaussianSmoothFilter;
+    // vtkSmartPointer<vtkImageGaussianSmooth> gaussianSmoothFilter;
     vtkSmartPointer<vtkImageResize> resize;
     int *imageDimensionArray = img->GetExtent();
     int imageDimension1 = imageDimensionArray[1] - imageDimensionArray[0] + 1;
     int imageDimension2 = imageDimensionArray[3] - imageDimensionArray[2] + 1;
     vtkImagePyramidData.push_back(img);
     for (int i=1; i<PyramidLevelCount; i++){
-      gaussianSmoothFilter = vtkSmartPointer<vtkImageGaussianSmooth>::New();
-      gaussianSmoothFilter->SetInputData(vtkImagePyramidData[i-1]);
-      gaussianSmoothFilter->Update();
+
+      // gaussianSmoothFilter = vtkSmartPointer<vtkImageGaussianSmooth>::New();
+      // gaussianSmoothFilter->SetInputData(vtkImagePyramidData[i-1]);
+      // gaussianSmoothFilter->Update();
+      vtkSmartPointer<vtkImageConvolve> convolveFilter =
+        vtkSmartPointer<vtkImageConvolve>::New();
+      convolveFilter->SetInputData(vtkImagePyramidData[i-1]);
+      double kernel[25] = {1,4,6,4,1,4,16,24,16,4,6,24,36,24,6,4,16,24,16,4,1,4,6,4,1};
+      for (int internal_loop=0; internal_loop<25;internal_loop++)
+      {
+        kernel[internal_loop] = kernel[internal_loop]/256;
+      }
+      convolveFilter->SetKernel5x5(kernel);
+      convolveFilter->Update();
+
       // Need to take care of gaussian pyramid variance
       resize = vtkSmartPointer<vtkImageResize>::New();
       resize->SetResizeMethodToOutputDimensions();
-      resize->SetInputData(gaussianSmoothFilter->GetOutput());
+      resize->SetInputData(convolveFilter->GetOutput());
+      // resize->SetInputData(gaussianSmoothFilter->GetOutput());
       resize->SetOutputDimensions(imageDimension1/(pow(2,i)), imageDimension2/(pow(2,i)), 1);
       resize->Update();
       vtkImagePyramidData.push_back(resize->GetOutput());
@@ -225,8 +240,6 @@ int main(int argc, char* argv[])
     extractQFilter->Update();
     //-------------------------------------------------------------------------
 
-    DEBUG
-
     for (int color_channel=0; color_channel<3; color_channel++){
 
       // -------------Copy Image Pyramid into corresponding variable-------
@@ -258,7 +271,6 @@ int main(int argc, char* argv[])
       }
       // --------Copied image pyramid into corresponding variable-------------
 
-      DEBUG
       // -------------initialising lowPass with first frame--------------------------
       // Initialising the Previous frame pyramid for frame 1. We initialise it to the first frame(which means first value of frame difference is going to be zero)
       if (ImageNumber==0)
@@ -527,9 +539,17 @@ int main(int argc, char* argv[])
           resize->SetOutputDimensions(imageDimension1/pow(2,(g-1)), imageDimension2/pow(2,(g-1)), -1);
           resize->Update();
 
-          gaussianSmoothFilter->SetInputData(resize->GetOutput());
-          gaussianSmoothFilter->Update();
-          sumFilter->SetInputData(gaussianSmoothFilter->GetOutput());
+          vtkSmartPointer<vtkImageConvolve> convolveFilter2 =
+            vtkSmartPointer<vtkImageConvolve>::New();
+          convolveFilter2->SetInputData(resize->GetOutput());
+          double kernel[25] = {1,4,6,4,1,4,16,24,16,4,6,24,36,24,6,4,16,24,16,4,1,4,6,4,1};
+          for (int internal_loop=0; internal_loop<25;internal_loop++)
+          {
+            kernel[internal_loop] = kernel[internal_loop]/256;
+          }
+          convolveFilter2->SetKernel5x5(kernel);
+          convolveFilter2->Update();
+          sumFilter->SetInputData(convolveFilter2->GetOutput());
           switch (color_channel) {
             case YChannel:
             {
