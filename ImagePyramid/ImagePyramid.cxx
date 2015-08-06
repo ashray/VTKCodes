@@ -98,6 +98,7 @@ public:
       this->vtkImagePyramidData[i] = vtkSmartPointer<vtkImageData>::New();
     }
   }
+  // Constructor assumes that the input image is only single channel
   vtkImagePyramid(vtkImageData *img) {
     vtkImagePyramid(img, 6); // Default PyramidLevelCount=6
   }
@@ -204,11 +205,9 @@ int main(int argc, char* argv[])
 
 
   int frameSize[NumberOfPyramidLevels];
-  // std::string directoryName = "/Users/ashraymalhotra/Desktop/Academic/VTKDev/Data/AllImages/";
-  std::string directoryName = "/Users/ashraymalhotra/Desktop/Academic/VTKDev/Data/ImageSequence/";
+  std::string dirString = "/Users/ashraymalhotra/Desktop/Academic/VTKDev/Data/ImageSequence/";
 
   // Create reader to read all images
-  std::string dirString = directoryName;
   vtksys::SystemTools::ConvertToUnixSlashes(dirString);
   vtkSmartPointer<vtkGlobFileNames> glob = vtkSmartPointer<vtkGlobFileNames>::New();
   glob->SetDirectory(dirString.c_str());
@@ -255,9 +254,8 @@ int main(int argc, char* argv[])
     extractQFilter->Update();
     //-------------------------------------------------------------------------
 
+    // ------------------Create image pyramids------------------------------
     for (int color_channel=0; color_channel<3; color_channel++){
-
-      // -------------Copy Image Pyramid into corresponding variable-------
       switch (color_channel){
         case YChannel:
           {
@@ -284,7 +282,7 @@ int main(int argc, char* argv[])
             break;
           }
       }
-      // --------Copied image pyramid into corresponding variable-------------
+    //-------------------------------------------------------------------------
 
       // -------------initialising lowPass with first frame--------------------------
       // Initialising the Previous frame pyramid for frame 1. We initialise it to the first frame(which means first value of frame difference is going to be zero)
@@ -379,9 +377,7 @@ int main(int argc, char* argv[])
             break;
           }
         }
-        //-----Updated lowpass variable-------
-
-
+        //------Updated lowpass variable-------
 
         //----Image Pyramid difference for IIR filtering-----
         vtkSmartPointer<vtkImageDifference> differenceFilter = vtkSmartPointer<vtkImageDifference>::New();
@@ -507,10 +503,7 @@ int main(int argc, char* argv[])
         }
         // -------------End of spatial filtering----------------------
 
-        //-------------VERIFY THE ALGO TO COLLAPSE PYRAMID. SEEMS WRONG---------------
         //-----------Collapse the image Pyramid------------------------
-
-        // Verify that the algorithm to implement the laplacian pyramid is correct
         vtkSmartPointer<vtkImageGaussianSmooth> gaussianSmoothFilter;
         vtkSmartPointer<vtkImageResize> resize;
         resize = vtkSmartPointer<vtkImageResize>::New();
@@ -546,14 +539,12 @@ int main(int argc, char* argv[])
             resize->SetInputData(sumFilter->GetOutput());
           }
 
+          resize->SetOutputDimensions(imageDimension1/pow(2,(g-1)), imageDimension2/pow(2,(g-1)), -1);
+          resize->Update();
           sumFilter = NULL;
           sumFilter = vtkSmartPointer<vtkImageWeightedSum>::New();
           sumFilter->SetWeight(0,0.5);
           sumFilter->SetWeight(1,0.5);
-
-          resize->SetOutputDimensions(imageDimension1/pow(2,(g-1)), imageDimension2/pow(2,(g-1)), -1);
-          resize->Update();
-
           vtkSmartPointer<vtkImageConvolve> convolveFilter2 =
             vtkSmartPointer<vtkImageConvolve>::New();
           convolveFilter2->SetInputData(resize->GetOutput());
@@ -608,8 +599,6 @@ int main(int argc, char* argv[])
         }
         //---------------Pyramid Collapsed into image---------------------------
 
-
-
         //----------Chromatic Abberation to reduce noise---------------
         vtkSmartPointer<vtkImageMathematics> chromaticCorrection =
           vtkSmartPointer<vtkImageMathematics>::New();
@@ -639,7 +628,6 @@ int main(int argc, char* argv[])
         // Note that we might have to multiply the intensity with a factor of 2 later...
         addDifferenceOrigFrameFilter->SetWeight(0,.5);
         addDifferenceOrigFrameFilter->SetWeight(1,.5);
-        // addDifferenceOrigFrameFilter->SetInputData(imageSource->GetOutput());
         switch (color_channel) {
           case YChannel:
           {
@@ -667,8 +655,6 @@ int main(int argc, char* argv[])
           }
         }
         //---------------------------------------------------------------------
-
-        // -----------------Debugging tip. Try to look at the color channel differences. We know what to expect in each of the color channels
 
       }   // End of the else loop(to perform operations only for frame numbers greater than 1)
     } //End of iteration over the 3 color channels
