@@ -1,181 +1,90 @@
+/*=========================================================================
+
+  Program:   Visualization Toolkit
+  Module:    main.cxx
+
+  Copyright (c) Ken Martin, Will Schroeder, Bill Lorensen
+  All rights reserved.
+  See Copyright.txt or http://www.kitware.com/Copyright.htm for details.
+
+     This software is distributed WITHOUT ANY WARRANTY; without even
+     the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR
+     PURPOSE.  See the above copyright notice for more information.
+
+=========================================================================*/
+
+//Program to demonstrate Eulerian Motion Magnification
+//by Ashray Malhotra
+//for more information see http://www.kitware.com/blog/home/post/952
+
 #define YChannel 0
 #define IChannel 1
 #define QChannel 2
 
 // #define debug
 
-#ifdef debug
-#define DEBUG printf("line number %d\n", __LINE__);
-#else
-#define DEBUG
-#endif
+#include "vtkImagePyramid.h"
 
-#include <vtkSmartPointer.h>
-#include <vtkProperty.h>
 #include <vtkDataSetMapper.h>
-#include <vtkImageActor.h>
-#include <vtkImageViewer2.h>
-#include <vtkImageReader2Factory.h>
-#include <vtkRenderWindow.h>
-#include <vtkRenderWindowInteractor.h>
-#include <vtkRenderer.h>
-#include <vtkImageGaussianSmooth.h>
-
-#include <vtkSmartPointer.h>
-#include <vtkImageReader2Factory.h>
-#include <vtkImageReader2.h>
-#include <vtkImageData.h>
-#include <vtkImageMapper3D.h>
-#include <vtkRenderWindow.h>
-#include <vtkRenderWindowInteractor.h>
-#include <vtkInteractorStyleImage.h>
-#include <vtkRenderer.h>
-#include <vtkImageActor.h>
-#include <vtkImageExtractComponents.h>
-
-
-#include <vtkImageResize.h>
-#include "vtkImageSincInterpolator.h"
-#include <vtkImageRGBToYIQ.h>
-#include <vtkImageYIQToRGB.h>
-
 #include <vtkGlobFileNames.h>
-#include <vtksys/SystemTools.hxx>
-#include <string>
-#include <sstream>
-#include <cstdio>
-#include <cmath>
-#include "vtkStringArray.h"
-
-#include <vtkImageShiftScale.h>
-#include <vtkImageDifference.h>
-#include <vtkImageMathematics.h>
-#include <vtkImageWeightedSum.h>
+#include <vtkImageActor.h>
 #include <vtkImageAppendComponents.h>
-#include <vtkPNGWriter.h>
-
 #include <vtkImageConvolve.h>
 
-std::string showDims (vtkImageData *img)
-{
-  std::ostringstream strm;
-  int *exts;
-  exts = img->GetExtent();
-  strm << "(" << exts[1] - exts[0] << ", " << exts[3] - exts[2] << ", " << exts[5] - exts[4] << ")";
-  return strm.str();
-}
+#include <vtkImageData.h>
+#include <vtkImageDifference.h>
 
-// Originally defined as struct, hence the improper naming.
-// class ImageStruct
-// {
-// public:
-//   ImageStruct() { this->imagedata = vtkSmartPointer<vtkImageData>::New(); }
-//   ~ImageStruct() { this->imagedata = NULL; } // Assigning VTK Smart pointer to null deletes it
-//   vtkSmartPointer<vtkImageData> imagedata;
-// };
+#include <vtkImageExtractComponents.h>
+#include <vtkImageGaussianSmooth.h>
+#include <vtkImageMapper3D.h>
+#include <vtkImageMathematics.h>
+#include <vtkImageReader2.h>
+#include <vtkImageReader2Factory.h>
+#include <vtkImageResize.h>
+#include <vtkImageRGBToYIQ.h>
+#include <vtkImageShiftScale.h>
+#include <vtkImageSincInterpolator.h>
+#include <vtkImageViewer2.h>
+#include <vtkImageWeightedSum.h>
+#include <vtkImageYIQToRGB.h>
+#include <vtkInteractorStyleImage.h>
+#include <vtkPNGWriter.h>
+#include <vtkProperty.h>
+#include <vtkRenderer.h>
+#include <vtkRenderWindow.h>
+#include <vtkRenderWindowInteractor.h>
+#include <vtkSmartPointer.h>
+#include <vtkStringArray.h>
 
-class vtkImagePyramid: public vtkObjectBase
-{
-public:
-  std::vector<vtkSmartPointer<vtkImageData> > vtkImagePyramidData;
+#include <vtksys/SystemTools.hxx>
+#include <cmath>
+#include <cstdio>
+#include <sstream>
+#include <string>
 
-  void ShallowCopy(vtkImagePyramid *imp) // Let's keep this short. Heh! :)
-  {
-    this->vtkImagePyramidData.clear();
-    this->vtkImagePyramidData.resize(imp->vtkImagePyramidData.size()); // Not strictly necessary
-    for(size_t i = 0; i != imp->vtkImagePyramidData.size(); ++i) {
-      DEBUG
-      this->vtkImagePyramidData[i] = vtkSmartPointer<vtkImageData>::New();
-      this->vtkImagePyramidData[i]->ShallowCopy(imp->vtkImagePyramidData[i]);
-      DEBUG
-    }
-  }
-
-  vtkImagePyramid(){};
-  vtkImagePyramid(int levels) {
-    this->vtkImagePyramidData.resize(levels);
-    for(size_t i = 0; i < levels; ++i) {
-      this->vtkImagePyramidData[i] = vtkSmartPointer<vtkImageData>::New();
-    }
-  }
-  // Constructor assumes that the input image is only single channel
-  vtkImagePyramid(vtkImageData *img) {
-    vtkImagePyramid(img, 6); // Default PyramidLevelCount=6
-  }
-  vtkImagePyramid(vtkImageData *img, int PyramidLevelCount)
-  {
-
-    // vtkSmartPointer<vtkImageGaussianSmooth> gaussianSmoothFilter;
-    vtkSmartPointer<vtkImageResize> resize;
-    int *imageDimensionArray = img->GetExtent();
-    int imageDimension1 = imageDimensionArray[1] - imageDimensionArray[0] + 1;
-    int imageDimension2 = imageDimensionArray[3] - imageDimensionArray[2] + 1;
-    vtkImagePyramidData.push_back(img);
-    for (int i=1; i<PyramidLevelCount; i++){
-
-      vtkSmartPointer<vtkImageConvolve> convolveFilter =
-        vtkSmartPointer<vtkImageConvolve>::New();
-      convolveFilter->SetInputData(vtkImagePyramidData[i-1]);
-      double kernel[25] = {1,4,6,4,1,4,16,24,16,4,6,24,36,24,6,4,16,24,16,4,1,4,6,4,1};
-      for (int internal_loop=0; internal_loop<25;internal_loop++)
-      {
-        kernel[internal_loop] = kernel[internal_loop]/256;
-      }
-      convolveFilter->SetKernel5x5(kernel);
-      convolveFilter->Update();
-
-      resize = vtkSmartPointer<vtkImageResize>::New();
-      resize->SetResizeMethodToOutputDimensions();
-      resize->SetInputData(convolveFilter->GetOutput());
-      resize->SetOutputDimensions(imageDimension1/(pow(2,i)), imageDimension2/(pow(2,i)), 1);
-      resize->Update();
-
-      vtkImagePyramidData.push_back(resize->GetOutput());
-    }
-
-    for (int i=1; i<PyramidLevelCount-1; i++)
-    {
-      resize = vtkSmartPointer<vtkImageResize>::New();
-      resize->SetResizeMethodToOutputDimensions();
-      resize->SetInputData(vtkImagePyramidData[i+1]);
-      resize->SetOutputDimensions(imageDimension1/(pow(2,i)), imageDimension2/(pow(2,i)), 1);
-      resize->Update();
-      vtkSmartPointer<vtkImageDifference> differenceFilter2 =
-        vtkSmartPointer<vtkImageDifference>::New();
-      differenceFilter2->AllowShiftOff();
-      differenceFilter2->AveragingOff();
-      differenceFilter2->SetAllowShift(0);
-      differenceFilter2->SetThreshold(0);
-      differenceFilter2->SetInputData(vtkImagePyramidData[i]);
-      differenceFilter2->SetImageData(resize->GetOutput());
-      differenceFilter2->Update();
-      vtkImagePyramidData[i] = differenceFilter2->GetOutput();
-    }
-  }
-
-  ~vtkImagePyramid() {;}// TODO - Complete the destructor
-};
-
-
-// Most of the variables used below are heuristics, please feel free to experiment.
-// -------Variables used in IIR(Infinite impulse response) magnification of the video-----
-int alpha = 10;
-int lambda_c = 16;
-float delta = lambda_c/(8*(1+alpha));
-//exaggeration_factor HAS to be a user defined constant, above values could be hardcoded as well, preferrably not
-int exaggeration_factor = 200;
-// ---------------------------------------------------------------------------------------
-
-// -------Spatial Filtering variables-----------
-float r1 = 0.4;
-float r2 = 0.05;
-// ---------------------------------------------------------------------------------------
-
-double chromatic_abberation = 0.1; //User given input
-int NumberOfPyramidLevels = 6;  // User choice, prefer to keep the default to 6.
+#include "conveniences.h"
+#include "constants.h"
 
 int main(int argc, char* argv[])
 {
+
+  std::string dirString = "/Users/ashraymalhotra/Desktop/Academic/VTKDev/Data/AllImages/";
+  if (argc < 2)
+    {
+    cerr << "WARNING: Expected arguments" << argv[0] << "/directory/path/to/numbered/image/files/" << endl;
+    cerr << "defaulting to " << dirString << endl;
+    }
+  else
+    {
+    dirString = argv[1];
+    }
+
+  bool show = false;
+  if (argc == 3 && !strcmp(argv[2], "show"))
+    {
+    show = true;
+    }
+
   // Have to define these variables as global since used in mapper, can be optimised better
   vtkSmartPointer<vtkImagePyramid> YPyramid;
   vtkSmartPointer<vtkImagePyramid> IPyramid;
@@ -205,8 +114,6 @@ int main(int argc, char* argv[])
 
 
   int frameSize[NumberOfPyramidLevels];
-  // std::string dirString = "/Users/ashraymalhotra/Desktop/Academic/VTKDev/Data/ImageSequence/";
-  std::string dirString = "/Users/ashraymalhotra/Desktop/Academic/VTKDev/Data/AllImages/";
   // Create reader to read all images
   vtksys::SystemTools::ConvertToUnixSlashes(dirString);
   vtkSmartPointer<vtkGlobFileNames> glob = vtkSmartPointer<vtkGlobFileNames>::New();
@@ -215,7 +122,8 @@ int main(int argc, char* argv[])
   int frameCount = glob->GetNumberOfFileNames();
   cout << "Number of Images read " << frameCount << "\n";
 
-  for (int ImageNumber = 0; ImageNumber < frameCount; ImageNumber++){
+  for (int ImageNumber = 0; ImageNumber < frameCount; ImageNumber++)
+    {
     std::string inputFilename = glob->GetNthFileName(ImageNumber);
     cout << inputFilename << "\n";
 
@@ -285,14 +193,15 @@ int main(int argc, char* argv[])
     //-------------------------------------------------------------------------
 
       // -------------initialising lowPass with first frame--------------------------
-      // Initialising the Previous frame pyramid for frame 1. We initialise it to the first frame(which means first value of frame difference is going to be zero)
+      // Initialising the Previous frame pyramid for frame 1. We initialise it to the
+      // first frame(which means first value of frame difference is going to be zero)
       if (ImageNumber==0)
       {
         switch (color_channel)
         {
           case YChannel:
           {
-            DEBUG
+            DEBUG;
             lowPass1Y = new vtkImagePyramid();
             lowPass2Y = new vtkImagePyramid();
             lowPass1Y->ShallowCopy(YPyramid);
@@ -301,7 +210,7 @@ int main(int argc, char* argv[])
           }
           case IChannel:
           {
-            DEBUG
+            DEBUG;
             lowPass1I = new vtkImagePyramid();
             lowPass2I = new vtkImagePyramid();
             lowPass1I->ShallowCopy(IPyramid);
@@ -310,7 +219,7 @@ int main(int argc, char* argv[])
           }
           case QChannel:
           {
-            DEBUG
+            DEBUG;
             lowPass1Q = new vtkImagePyramid();
             lowPass2Q = new vtkImagePyramid();
             lowPass1Q->ShallowCopy(QPyramid);
@@ -691,7 +600,7 @@ int main(int argc, char* argv[])
       rgbConversionFilter->Update();
       // -------------------------------------------------------------------------------
 
-      std::string iterationNumberString = std::to_string(ImageNumber);
+      std::string iterationNumberString = to_string(ImageNumber);
       std::string outputFileName = "OutputFrame" + iterationNumberString+".png";
       vtkSmartPointer<vtkPNGWriter> writeDifferenceFrames = vtkSmartPointer<vtkPNGWriter>::New();
       writeDifferenceFrames->SetFileName(outputFileName.c_str());
@@ -699,42 +608,50 @@ int main(int argc, char* argv[])
       writeDifferenceFrames->Write();
     }
 
-  // --------Use the code below to visualise the frames instead of writing the frames to disk---------
+    if (show)
+      {
+      cerr << "TODO show" << endl;
 
-  // vtkSmartPointer<vtkDataSetMapper> mapper =
-  //   vtkSmartPointer<vtkDataSetMapper>::New();
-  //
-  // // mapper->SetInputConnection(resize->GetOutputPort());
-  //
-  // //-------------------Suspected code snippet causing segmentation error----------------------------
-  // // Why does mapper->SetInputData(ImagePyramidGeneral[0].imagedata);  throw up an error?
-  // // mapper->SetInputData(YDifference[0].imagedata);
-  // mapper->SetInputData(rgbConversionFilter->GetOutput());
-  //   // mapper->SetInputData(differenceFilter->GetOutput);
-  // // mapper->SetInputData(resize->GetOutput());
-  // //--------------------------------------------------------------------------------------------------
-  //
-  // vtkSmartPointer<vtkActor> actor =
-  //   vtkSmartPointer<vtkActor>::New();
-  // actor->SetMapper(mapper);
-  // actor->GetProperty()->SetRepresentationToWireframe();
-  //
-  // vtkSmartPointer<vtkRenderer> renderer =
-  //   vtkSmartPointer<vtkRenderer>::New();
-  // renderer->AddActor(actor);
-  // renderer->ResetCamera();
-  // renderer->SetBackground(1,1,1);
-  //
-  // vtkSmartPointer<vtkRenderWindow> renderWindow =
-  //   vtkSmartPointer<vtkRenderWindow>::New();
-  // renderWindow->AddRenderer(renderer);
-  //
-  // vtkSmartPointer<vtkRenderWindowInteractor> renderWindowInteractor =
-  //   vtkSmartPointer<vtkRenderWindowInteractor>::New();
-  // renderWindowInteractor->SetRenderWindow(renderWindow);
-  // renderWindowInteractor->Initialize();
-  //
-  // renderWindowInteractor->Start();
+      //or maybe use vtkFFMPEG to encode into a new video.
+      //I think it is fine to dump into files and let user decide
+
+      // --------Use the code below to visualise the frames instead of writing the frames to disk---------
+      // vtkSmartPointer<vtkDataSetMapper> mapper =
+      //   vtkSmartPointer<vtkDataSetMapper>::New();
+      //
+      // // mapper->SetInputConnection(resize->GetOutputPort());
+      //
+      // //-------------------Suspected code snippet causing segmentation error----------------------------
+      // // Why does mapper->SetInputData(ImagePyramidGeneral[0].imagedata);  throw up an error?
+      // // mapper->SetInputData(YDifference[0].imagedata);
+      // mapper->SetInputData(rgbConversionFilter->GetOutput());
+      //   // mapper->SetInputData(differenceFilter->GetOutput);
+      // // mapper->SetInputData(resize->GetOutput());
+      // //--------------------------------------------------------------------------------------------------
+      //
+      // vtkSmartPointer<vtkActor> actor =
+      //   vtkSmartPointer<vtkActor>::New();
+      // actor->SetMapper(mapper);
+      // actor->GetProperty()->SetRepresentationToWireframe();
+      //
+      // vtkSmartPointer<vtkRenderer> renderer =
+      //   vtkSmartPointer<vtkRenderer>::New();
+      // renderer->AddActor(actor);
+      // renderer->ResetCamera();
+      // renderer->SetBackground(1,1,1);
+      //
+      // vtkSmartPointer<vtkRenderWindow> renderWindow =
+      //   vtkSmartPointer<vtkRenderWindow>::New();
+      // renderWindow->AddRenderer(renderer);
+      //
+      // vtkSmartPointer<vtkRenderWindowInteractor> renderWindowInteractor =
+      //   vtkSmartPointer<vtkRenderWindowInteractor>::New();
+      // renderWindowInteractor->SetRenderWindow(renderWindow);
+      // renderWindowInteractor->Initialize();
+      //
+      // renderWindowInteractor->Start();
+      }
+
   } //End of iteration over all input frames of the video(input images)
   return EXIT_SUCCESS;
 }

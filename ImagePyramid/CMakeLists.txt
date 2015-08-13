@@ -1,17 +1,20 @@
+cmake_minimum_required (VERSION 2.8)
 
-cmake_minimum_required(VERSION 2.8)
+project (ImagePyramid)
 
-PROJECT(ImagePyramid)
+set (CMAKE_BUILD_TYPE Debug)
 
-set(CMAKE_BUILD_TYPE Debug)
+find_package (VTK REQUIRED)
+include (${VTK_USE_FILE})
 
-find_package(VTK REQUIRED)
-include(${VTK_USE_FILE})
+set (files
+  conveniences.h
+  conveniences.cxx
+  main.cxx
+  vtkImagePyramid.h
+  vtkImagePyramid.cxx
+)
 
-add_executable(ImagePyramid MACOSX_BUNDLE ImagePyramid)
+add_executable (ImagePyramid MACOSX_BUNDLE ${files})
 
-if(VTK_LIBRARIES)
-  target_link_libraries(ImagePyramid ${VTK_LIBRARIES})
-else()
-  target_link_libraries(ImagePyramid vtkHybrid vtkWidgets)
-endif()
+target_link_libraries (ImagePyramid ${VTK_LIBRARIES})
