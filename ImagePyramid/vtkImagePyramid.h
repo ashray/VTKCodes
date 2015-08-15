@@ -30,19 +30,19 @@ class vtkImagePyramid: public vtkObjectBase
 {
  public:
   //Description:
-  // tbd
+  // Empty Constructor
   vtkImagePyramid();
 
   //Description:
-  // tbd
+  // Constructor initialises the specified number of levels
   vtkImagePyramid(int levels);
 
   //Description:
-  // Constructor assumes that the input image is only single channel
+  // Constructor assumes that the input image is only single channel.
   vtkImagePyramid(vtkImageData *img);
 
   //Description:
-  // tbd
+  // Constructor assumes that the input image is only single channel and allows user defined pyramid levels. Defaults to 6.
   vtkImagePyramid(vtkImageData *img, int PyramidLevelCount);
 
   //Description:
@@ -50,7 +50,7 @@ class vtkImagePyramid: public vtkObjectBase
   ~vtkImagePyramid();
 
   //Description:
-  // tbd
+  // Copies one image pyramid to the other.
   void ShallowCopy(vtkImagePyramid *imp);
 
   //Description:
