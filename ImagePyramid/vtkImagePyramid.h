@@ -54,6 +54,10 @@ class vtkImagePyramid: public vtkObjectBase
   void ShallowCopy(vtkImagePyramid *imp);
 
   //Description:
+  // Collapses the image pyramid into an image
+  vtkSmartPointer<vtkImageData> Collapse();
+
+  //Description:
   // tbd
   std::vector<vtkSmartPointer<vtkImageData> > vtkImagePyramidData;
 };

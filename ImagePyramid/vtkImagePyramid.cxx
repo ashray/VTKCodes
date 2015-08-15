@@ -21,7 +21,7 @@
 #include <vtkImageResize.h>
 #include <vtkSmartPointer.h>
 #include <vtkImageMathematics.h>
-
+#include <vtkImageWeightedSum.h>
 #include "conveniences.h"
 #include "constants.h"
 
@@ -97,17 +97,6 @@ if(PyramidChoice==1)
     imageMath->SetInput2Data(resize->GetOutput());
     imageMath->Update();
     vtkImagePyramidData[i] = imageMath->GetOutput();
-
-    // vtkSmartPointer<vtkImageDifference> differenceFilter2 =
-    //   vtkSmartPointer<vtkImageDifference>::New();
-    // differenceFilter2->AllowShiftOff();
-    // differenceFilter2->AveragingOff();
-    // differenceFilter2->SetAllowShift(0);
-    // differenceFilter2->SetThreshold(0);
-    // differenceFilter2->SetInputData(vtkImagePyramidData[i]);
-    // differenceFilter2->SetImageData(resize->GetOutput());
-    // differenceFilter2->Update();
-    // vtkImagePyramidData[i] = differenceFilter2->GetOutput();
     }
   }
 
@@ -131,4 +120,55 @@ void vtkImagePyramid::ShallowCopy(vtkImagePyramid *imp)
     this->vtkImagePyramidData[i]->ShallowCopy(imp->vtkImagePyramidData[i]);
     DEBUG
     }
+}
+
+vtkSmartPointer<vtkImageData> vtkImagePyramid::Collapse()
+{
+  vtkSmartPointer<vtkImageWeightedSum> sumFilter;
+  vtkSmartPointer<vtkImageResize> resize;
+
+  sumFilter = vtkSmartPointer<vtkImageWeightedSum>::New();
+  sumFilter->SetWeight(0,0.5);
+  sumFilter->SetWeight(1,0.5);
+
+  int* imageDimensionArray = this->vtkImagePyramidData[0]->GetExtent();
+  int imageDimension1 = imageDimensionArray[1] - imageDimensionArray[0] + 1;
+  int imageDimension2 = imageDimensionArray[3] - imageDimensionArray[2] + 1;
+  int levelsCount = (int)this->vtkImagePyramidData.size();
+
+
+  for (int g = (levelsCount-1); g>=1; g--)
+  {
+    resize = vtkSmartPointer<vtkImageResize>::New();
+    resize->SetResizeMethodToOutputDimensions();
+
+    if (g == (levelsCount-1))
+    {
+      resize->SetInputData(this->vtkImagePyramidData[levelsCount-1]);
+    }
+    else
+    {
+      resize->SetInputData(sumFilter->GetOutput());
+    }
+    resize->SetOutputDimensions(imageDimension1/pow(2,(g-1)), imageDimension2/pow(2,(g-1)), -1);
+    resize->Update();
+
+    // Using Self designed kernel.
+    // TODO - Give option to the user to chosse either custom kernel or gaussian smoothing
+    vtkSmartPointer<vtkImageConvolve> convolveFilter2 =
+      vtkSmartPointer<vtkImageConvolve>::New();
+    convolveFilter2->SetInputData(resize->GetOutput());
+    double kernel[25] = {1,4,6,4,1,4,16,24,16,4,6,24,36,24,6,4,16,24,16,4,1,4,6,4,1};
+    for (int internal_loop=0; internal_loop<25;internal_loop++)
+    {
+      kernel[internal_loop] = kernel[internal_loop]/256;
+    }
+    convolveFilter2->SetKernel5x5(kernel);
+    convolveFilter2->Update();
+
+    sumFilter->SetInputData(convolveFilter2->GetOutput());
+    sumFilter->AddInputData(this->vtkImagePyramidData[g-1]);
+    sumFilter->Update();
+  }
+  return sumFilter->GetOutput();
 }

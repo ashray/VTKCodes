@@ -101,9 +101,9 @@ int main(int argc, char* argv[])
   vtkSmartPointer<vtkImagePyramid> IDifference;
   vtkSmartPointer<vtkImagePyramid> QDifference;
 
-  vtkSmartPointer<vtkImageData> FrameDifferenceY = vtkSmartPointer<vtkImageData>::New();
-  vtkSmartPointer<vtkImageData> FrameDifferenceI = vtkSmartPointer<vtkImageData>::New();
-  vtkSmartPointer<vtkImageData> FrameDifferenceQ = vtkSmartPointer<vtkImageData>::New();
+  vtkSmartPointer<vtkImageData> FrameDifferenceY;
+  vtkSmartPointer<vtkImageData> FrameDifferenceI;
+  vtkSmartPointer<vtkImageData> FrameDifferenceQ;
   vtkSmartPointer<vtkImageData> OutputFrameY = vtkSmartPointer<vtkImageData>::New();
   vtkSmartPointer<vtkImageData> OutputFrameI = vtkSmartPointer<vtkImageData>::New();
   vtkSmartPointer<vtkImageData> OutputFrameQ = vtkSmartPointer<vtkImageData>::New();
@@ -412,101 +412,23 @@ int main(int argc, char* argv[])
         }
         // -------------End of spatial filtering----------------------
 
-        //-----------Collapse the image Pyramid------------------------
-        vtkSmartPointer<vtkImageGaussianSmooth> gaussianSmoothFilter;
-        vtkSmartPointer<vtkImageResize> resize;
-        resize = vtkSmartPointer<vtkImageResize>::New();
-        gaussianSmoothFilter = vtkSmartPointer<vtkImageGaussianSmooth>::New();
-        vtkSmartPointer<vtkImageWeightedSum> sumFilter = vtkSmartPointer<vtkImageWeightedSum>::New();
-        sumFilter->SetWeight(0,0.5);
-        sumFilter->SetWeight(1,0.5);
-        resize->SetResizeMethodToOutputDimensions();
-        for (int g = (NumberOfPyramidLevels-1); g>=1; g--)
+        switch (color_channel)
         {
-          if (g == (NumberOfPyramidLevels-1))
+          case YChannel:
           {
-            switch (color_channel) {
-              case YChannel:
-              {
-                resize->SetInputData(YDifference->vtkImagePyramidData[g]);
-                break;
-              }
-              case IChannel:
-              {
-                resize->SetInputData(IDifference->vtkImagePyramidData[g]);
-                break;
-              }
-              case QChannel:
-              {
-                resize->SetInputData(QDifference->vtkImagePyramidData[g]);
-                break;
-              }
-            }
+            FrameDifferenceY = YDifference->Collapse();
           }
-          else
+          case IChannel:
           {
-            resize->SetInputData(sumFilter->GetOutput());
+            FrameDifferenceI = IDifference->Collapse();
+            break;
           }
-
-          resize->SetOutputDimensions(imageDimension1/pow(2,(g-1)), imageDimension2/pow(2,(g-1)), -1);
-          resize->Update();
-          sumFilter = NULL;
-          sumFilter = vtkSmartPointer<vtkImageWeightedSum>::New();
-          sumFilter->SetWeight(0,0.5);
-          sumFilter->SetWeight(1,0.5);
-          vtkSmartPointer<vtkImageConvolve> convolveFilter2 =
-            vtkSmartPointer<vtkImageConvolve>::New();
-          convolveFilter2->SetInputData(resize->GetOutput());
-          double kernel[25] = {1,4,6,4,1,4,16,24,16,4,6,24,36,24,6,4,16,24,16,4,1,4,6,4,1};
-          for (int internal_loop=0; internal_loop<25;internal_loop++)
+          case QChannel:
           {
-            kernel[internal_loop] = kernel[internal_loop]/256;
-          }
-          convolveFilter2->SetKernel5x5(kernel);
-          convolveFilter2->Update();
-          sumFilter->SetInputData(convolveFilter2->GetOutput());
-          switch (color_channel) {
-            case YChannel:
-            {
-              sumFilter->AddInputData(YDifference->vtkImagePyramidData[g-1]);
-              break;
-            }
-            case IChannel:
-            {
-              sumFilter->AddInputData(IDifference->vtkImagePyramidData[g-1]);
-              break;
-            }
-            case QChannel:
-            {
-              sumFilter->AddInputData(QDifference->vtkImagePyramidData[g-1]);
-              break;
-            }
-          }
-          sumFilter->Update();
-
-          // --------------Save the final image in corresponding difference variable---------
-          if (g==1)
-          {
-            switch (color_channel)
-            {
-              case YChannel:
-              {
-                FrameDifferenceY->ShallowCopy(sumFilter->GetOutput());
-              }
-              case IChannel:
-              {
-                FrameDifferenceI->ShallowCopy(sumFilter->GetOutput());
-                break;
-              }
-              case QChannel:
-              {
-                FrameDifferenceQ->ShallowCopy(sumFilter->GetOutput());
-                break;
-              }
-            }
+            FrameDifferenceQ = QDifference->Collapse();
+            break;
           }
         }
-        //---------------Pyramid Collapsed into image---------------------------
 
         //----------Chromatic Abberation to reduce noise---------------
         vtkSmartPointer<vtkImageMathematics> chromaticCorrection =
