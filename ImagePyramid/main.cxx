@@ -107,7 +107,6 @@ int main(int argc, char* argv[])
   vtkSmartPointer<vtkImageData> OutputFrameY = vtkSmartPointer<vtkImageData>::New();
   vtkSmartPointer<vtkImageData> OutputFrameI = vtkSmartPointer<vtkImageData>::New();
   vtkSmartPointer<vtkImageData> OutputFrameQ = vtkSmartPointer<vtkImageData>::New();
-  vtkSmartPointer<vtkImageExtractComponents> imageSource; // Moved outside since we need it to add back the differences
   vtkSmartPointer<vtkImageYIQToRGB> rgbConversionFilter =
     vtkSmartPointer<vtkImageYIQToRGB>::New(); // Made a global variable so that can be accessed by mapper
 
@@ -133,9 +132,6 @@ int main(int argc, char* argv[])
     vtkImageReader2 * imageReader = readerFactory->CreateImageReader2(inputFilename.c_str());
     imageReader->SetFileName(inputFilename.c_str());
     imageReader->Update();
-    int* imageDimensionArray = imageReader->GetOutput()->GetExtent();
-    int imageDimension1 = imageDimensionArray[1] - imageDimensionArray[0] + 1;
-    int imageDimension2 = imageDimensionArray[3] - imageDimensionArray[2] + 1;
 
     // ---------------------Get YIQ components-----------------------------
     vtkSmartPointer<vtkImageRGBToYIQ> yiqFilter =
@@ -161,6 +157,7 @@ int main(int argc, char* argv[])
     extractQFilter->SetComponents(2);
     extractQFilter->Update();
     //-------------------------------------------------------------------------
+
 
     // ------------------Create image pyramids------------------------------
     for (int color_channel=0; color_channel<3; color_channel++){
