@@ -32,7 +32,8 @@ std::string to_string(T value)
   return os.str();
 }
 
-std::string showDims (vtkImageData *img);
+std::string showDims (vtkImageData *);
+int getImageDimensions (vtkImageData *);
 
 #ifdef debug
 #define DEBUG printf("line number %d\n", __LINE__);

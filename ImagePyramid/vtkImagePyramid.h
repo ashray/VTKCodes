@@ -26,7 +26,7 @@
 
 class vtkImageData;
 
-class vtkImagePyramid: public vtkObjectBase
+class vtkImagePyramid//: public vtkObjectBase
 {
  public:
   //Description:

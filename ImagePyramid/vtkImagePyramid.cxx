@@ -17,9 +17,7 @@
 
 #include <vtkImageConvolve.h>
 #include <vtkImageData.h>
-#include <vtkImageDifference.h>
 #include <vtkImageResize.h>
-#include <vtkSmartPointer.h>
 #include <vtkImageMathematics.h>
 #include <vtkImageWeightedSum.h>
 #include "conveniences.h"
@@ -105,7 +103,11 @@ if(PyramidChoice==1)
 //------------------------------------------------------------------------------
 vtkImagePyramid::~vtkImagePyramid()
 {
-  // TODO - Complete the destructor
+  this->vtkImagePyramidData.resize(0);
+//  for(size_t i = 0; i < this->vtkImagePyramidData.size(); i++)
+//  {
+//    this->vtkImagePyramidData[i] = NULL;
+//  }
 }
 
 //------------------------------------------------------------------------------
@@ -115,10 +117,8 @@ void vtkImagePyramid::ShallowCopy(vtkImagePyramid *imp)
   this->vtkImagePyramidData.resize(imp->vtkImagePyramidData.size()); // Not strictly necessary
   for(size_t i = 0; i != imp->vtkImagePyramidData.size(); ++i)
     {
-    DEBUG
       this->vtkImagePyramidData[i] = vtkSmartPointer<vtkImageData>::New();
-    this->vtkImagePyramidData[i]->ShallowCopy(imp->vtkImagePyramidData[i]);
-    DEBUG
+      this->vtkImagePyramidData[i]->ShallowCopy(imp->vtkImagePyramidData[i]);
     }
 }
 
