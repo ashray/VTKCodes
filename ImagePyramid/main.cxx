@@ -53,6 +53,12 @@
 #include "conveniences.h"
 #include "constants.h"
 
+void writeImage(vtkImageData *img, const char *filename) {
+  vtkSmartPointer<vtkPNGWriter> writer = vtkSmartPointer<vtkPNGWriter>::New();
+  writer->SetFileName(filename);
+  writer->SetInputData(img);
+  writer->Write();
+}
 
 int main(int argc, char* argv[])
 {
@@ -167,6 +173,14 @@ int main(int argc, char* argv[])
       extractFilter->Update();
       activeImage = extractFilter->GetOutput();
 
+      //WRITENDEBUG
+      {
+        std::ostringstream file;
+        file << "cleaned/" << ImageNumber << "activeimage" << color_channel << ".png";
+        writeImage(activeImage,file.str().c_str());
+      }
+      //END WRITENDEBUG
+
       //Create image pyramid
       Pyramid = new vtkImagePyramid(activeImage, NumberOfPyramidLevels);
 
@@ -206,10 +220,26 @@ int main(int argc, char* argv[])
           sumFilter2->Update();
           lowPass2[color_channel]->vtkImagePyramidData[k]->ShallowCopy(sumFilter2->GetOutput());
 
+      //WRITENDEBUG
+      {
+        std::ostringstream file;
+        file << "cleaned/" << ImageNumber << "lowPass1" << color_channel << ".png";
+        writeImage(lowPass1[color_channel]->Collapse(),file.str().c_str());
+      }
+      //END WRITENDEBUG
+      //WRITENDEBUG
+      {
+        std::ostringstream file;
+        file << "cleaned/" << ImageNumber << "lowPass2" << color_channel << ".png";
+        writeImage(lowPass2[color_channel]->Collapse(),file.str().c_str());
+      }
+      //END WRITENDEBUG
+
           imageMath->SetInput1Data(lowPass1[color_channel]->vtkImagePyramidData[k]);
           imageMath->SetInput2Data(lowPass2[color_channel]->vtkImagePyramidData[k]);
           imageMath->Update();
           differencePyramid->vtkImagePyramidData[k]->ShallowCopy(imageMath->GetOutput());
+
 // ------------------End of temporal filtering---------------------------
 
 //        Spatial filtering
@@ -228,6 +258,13 @@ int main(int argc, char* argv[])
 
         differenceFrame = differencePyramid->Collapse();
 
+        //WRITENDEBUG
+        {
+          std::ostringstream file;
+          file << "cleaned/"<< ImageNumber << "differenceFrame" << color_channel << ".png";
+          writeImage(differenceFrame,file.str().c_str());
+        }
+        //END WRITENDEBUG
 
         //----------Chromatic Aberration to reduce noise---------------
         if (color_channel != YChannel)
