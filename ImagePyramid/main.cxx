@@ -213,9 +213,9 @@ int main(int argc, char* argv[])
 // ------------------End of temporal filtering---------------------------
 
 //        Spatial filtering
-          float currAlpha = frameSize[k]/(delta*8) - 1;
+          int currAlpha = frameSize[k]/(delta*8) - 1;
           currAlpha = currAlpha * exaggeration_factor;
-          float mutiplier = currAlpha;
+          int mutiplier = currAlpha;
           if (mutiplier > alpha)
           {
             mutiplier = alpha;
