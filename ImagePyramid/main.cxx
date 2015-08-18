@@ -210,9 +210,12 @@ int main(int argc, char* argv[])
           imageMath->SetInput2Data(lowPass2[color_channel]->vtkImagePyramidData[k]);
           imageMath->Update();
           differencePyramid->vtkImagePyramidData[k]->ShallowCopy(imageMath->GetOutput());
+        }
 // ------------------End of temporal filtering---------------------------
 
 //        Spatial filtering
+        for (int k=1; k<NumberOfPyramidLevels-1; k++) // Is separate loop than temporal filtering, because limits
+        {
           int currAlpha = frameSize[k]/(delta*8) - 1;
           currAlpha = currAlpha * exaggeration_factor;
           int mutiplier = currAlpha;
