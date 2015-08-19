@@ -17,6 +17,8 @@
 #define conveniences_h
 
 #include <sstream>
+#include <vtkGlobFileNames.h>
+#include <vtkSmartPointer.h>
 
 class vtkImageData;
 
@@ -34,6 +36,7 @@ std::string to_string(T value)
 
 std::string showDims (vtkImageData *);
 int getImageDimensions (vtkImageData *);
+vtkSmartPointer<vtkGlobFileNames> fileReaderObjectCreation(int argc, char* argv[]);
 
 #ifdef debug
 #define DEBUG printf("line number %d\n", __LINE__);

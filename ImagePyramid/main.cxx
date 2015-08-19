@@ -57,7 +57,8 @@
 int main(int argc, char* argv[])
 {
 
-  vtkSmartPointer<vtkGlobFileNames> glob = vtkSmartPointer<vtkGlobFileNames>::New();
+// --------Variable definitions ---------
+  vtkSmartPointer<vtkGlobFileNames> glob;
   vtkSmartPointer<vtkImageReader2Factory> readerFactory = vtkSmartPointer<vtkImageReader2Factory>::New();
   vtkSmartPointer<vtkImageReader2> imageReader;
 
@@ -88,7 +89,7 @@ int main(int argc, char* argv[])
   vtkSmartPointer<vtkImageYIQToRGB> rgbConversionFilter = vtkSmartPointer<vtkImageYIQToRGB>::New();
   vtkSmartPointer<vtkImageData> activeImage;
 
-// Setup -----
+// ------Setup -----
   for(int i = 0; i < 3; i++)
   {
     lowPass1[i] = NULL;
@@ -100,7 +101,6 @@ int main(int argc, char* argv[])
   sumFilter2->SetWeight(0,r2);
   sumFilter2->SetWeight(1,(1-r2));
 
-  //----Image Pyramid difference for IIR filtering-----
   differenceFilter->AllowShiftOff();
   differenceFilter->AveragingOff();
   differenceFilter->SetAllowShift(0);
@@ -114,35 +114,13 @@ int main(int argc, char* argv[])
   addDifferenceOrigFrameFilter->SetWeight(1,.5);
   IntensityNormalisation->SetOperationToMultiplyByK();
   IntensityNormalisation->SetConstantK(2);
-
 // Setup done ----
 
-  if (argc < 2)
-  {
-    cerr << "WARNING: Expected arguments" << argv[0] << "/directory/path/to/numbered/image/files/" << endl;
-    cerr << "defaulting to current working directory " << endl;
-  }
-  else
-  {
-    std::string dirString;
-    dirString = argv[1];
-    vtksys::SystemTools::ConvertToUnixSlashes(dirString);
-    glob->SetDirectory(dirString.c_str());
-  }
-
-  bool show = false;
-  if (argc == 3 && !strcmp(argv[2], "show"))
-  {
-    show = true;
-  }
-
-
-  glob->AddFileNames("*");
-  int frameCount = glob->GetNumberOfFileNames();
-  cout << "Number of Images read " << frameCount << "\n";
-
-  for (int ImageNumber = 0; ImageNumber < frameCount; ImageNumber++)
+//  Creating reader to read images
+  glob = fileReaderObjectCreation(argc, argv);
+  for (int ImageNumber = 0; ImageNumber < glob->GetNumberOfFileNames(); ImageNumber++)
     {
+
     std::string inputFilename = glob->GetNthFileName(ImageNumber);
     cout << inputFilename << "\n";
 
@@ -280,51 +258,6 @@ int main(int argc, char* argv[])
       writeDifferenceFrames->SetInputData(rgbConversionFilter->GetOutput());
       writeDifferenceFrames->Write();
     }
-
-//      TODO - Make a function to show(uncomment the code basically and put it in a function)
-    if (show)
-      {
-      cerr << "TODO show" << endl;
-
-      //or maybe use vtkFFMPEG to encode into a new video.
-      //I think it is fine to dump into files and let user decide
-
-      // --------Use the code below to visualise the frames instead of writing the frames to disk---------
-      // vtkSmartPointer<vtkDataSetMapper> mapper =
-      //   vtkSmartPointer<vtkDataSetMapper>::New();
-      //
-      // // mapper->SetInputConnection(resize->GetOutputPort());
-      //
-      // //-------------------Suspected code snippet causing segmentation error----------------------------
-      // // Why does mapper->SetInputData(ImagePyramidGeneral[0].imagedata);  throw up an error?
-      // // mapper->SetInputData(YDifference[0].imagedata);
-      // mapper->SetInputData(rgbConversionFilter->GetOutput());
-      //   // mapper->SetInputData(differenceFilter->GetOutput);
-      // // mapper->SetInputData(resize->GetOutput());
-      // //--------------------------------------------------------------------------------------------------
-      //
-      // vtkSmartPointer<vtkActor> actor =
-      //   vtkSmartPointer<vtkActor>::New();
-      // actor->SetMapper(mapper);
-      // actor->GetProperty()->SetRepresentationToWireframe();
-      //
-      // vtkSmartPointer<vtkRenderer> renderer =
-      //   vtkSmartPointer<vtkRenderer>::New();
-      // renderer->AddActor(actor);
-      // renderer->ResetCamera();
-      // renderer->SetBackground(1,1,1);
-      //
-      // vtkSmartPointer<vtkRenderWindow> renderWindow =
-      //   vtkSmartPointer<vtkRenderWindow>::New();
-      // renderWindow->AddRenderer(renderer);
-      //
-      // vtkSmartPointer<vtkRenderWindowInteractor> renderWindowInteractor =
-      //   vtkSmartPointer<vtkRenderWindowInteractor>::New();
-      // renderWindowInteractor->SetRenderWindow(renderWindow);
-      // renderWindowInteractor->Initialize();
-      //
-      // renderWindowInteractor->Start();
-      }
   }
   return EXIT_SUCCESS;
 }
