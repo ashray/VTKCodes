@@ -20,6 +20,10 @@
 #include <vtkSmartPointer.h>
 #include "vtkImageData.h"
 #include <vtksys/SystemTools.hxx>
+#include <vtkImageReader2Factory.h>
+#include <vtkImageReader2.h>
+#include <vtkImageRGBToYIQ.h>
+#include <vtkImageExtractComponents.h>
 
 std::string showDims (vtkImageData *img)
 {
@@ -36,6 +40,8 @@ int getImageDimensions (vtkImageData *img)
   return int(pow((pow(a[1] - a[0] + 1,2) + pow(a[3] - a[2] + 1,2)), 0.5)/3);
   // 3 is an experimental constant used by the authors of the paper
 }
+
+//Helper functions
 
 vtkSmartPointer<vtkGlobFileNames> fileReaderObjectCreation(int argc, char* argv[])
 {
@@ -56,4 +62,29 @@ vtkSmartPointer<vtkGlobFileNames> fileReaderObjectCreation(int argc, char* argv[
   glob->AddFileNames("*");
   cout << "Number of Images read " << glob->GetNumberOfFileNames() << "\n";
   return glob;
+}
+
+vtkSmartPointer<vtkImageData> readInputImage(vtkSmartPointer<vtkGlobFileNames> glob, int imageNumber)
+{
+  vtkSmartPointer<vtkImageReader2> imageReader;
+  vtkSmartPointer<vtkImageReader2Factory> readerFactory = vtkSmartPointer<vtkImageReader2Factory>::New();
+  std::string inputFilename = glob->GetNthFileName(imageNumber);
+  cout << inputFilename << "\n";
+
+  imageReader = readerFactory->CreateImageReader2(inputFilename.c_str());
+  imageReader->SetFileName(inputFilename.c_str());
+  imageReader->Update();
+  return imageReader->GetOutput();
+}
+
+vtkSmartPointer<vtkImageData> extractColorChannel(vtkSmartPointer<vtkImageData>activeOutputFrame, int color_channel)
+{
+  vtkSmartPointer<vtkImageExtractComponents> extractFilter = vtkSmartPointer<vtkImageExtractComponents>::New();
+  vtkSmartPointer<vtkImageRGBToYIQ> yiqFilter = vtkSmartPointer<vtkImageRGBToYIQ>::New();
+  yiqFilter->SetInputData(activeOutputFrame);
+  yiqFilter->Update();
+  extractFilter->SetInputConnection(yiqFilter->GetOutputPort());
+  extractFilter->SetComponents(color_channel);
+  extractFilter->Update();
+  return extractFilter->GetOutput();
 }

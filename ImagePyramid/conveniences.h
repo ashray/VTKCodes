@@ -19,6 +19,7 @@
 #include <sstream>
 #include <vtkGlobFileNames.h>
 #include <vtkSmartPointer.h>
+#include <vtkImageData.h>
 
 class vtkImageData;
 
@@ -36,8 +37,19 @@ std::string to_string(T value)
 
 std::string showDims (vtkImageData *);
 int getImageDimensions (vtkImageData *);
+
+//Helper functions
+//Description:
+//Creates an image reader object setting path from command line input
 vtkSmartPointer<vtkGlobFileNames> fileReaderObjectCreation(int argc, char* argv[]);
 
+//Description:
+//Reads an input image
+vtkSmartPointer<vtkImageData> readInputImage(vtkSmartPointer<vtkGlobFileNames> glob, int imageNumber);
+
+//Description:
+//Extracts a specific color channel from an image
+vtkSmartPointer<vtkImageData> extractColorChannel(vtkSmartPointer<vtkImageData>activeOutputFrame, int color_channel);
 #ifdef debug
 #define DEBUG printf("line number %d\n", __LINE__);
 #else

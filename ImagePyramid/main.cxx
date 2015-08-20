@@ -59,9 +59,6 @@ int main(int argc, char* argv[])
 
 // --------Variable definitions ---------
   vtkSmartPointer<vtkGlobFileNames> glob;
-  vtkSmartPointer<vtkImageReader2Factory> readerFactory = vtkSmartPointer<vtkImageReader2Factory>::New();
-  vtkSmartPointer<vtkImageReader2> imageReader;
-
   vtkSmartPointer<vtkImageRGBToYIQ> yiqFilter = vtkSmartPointer<vtkImageRGBToYIQ>::New();
   vtkSmartPointer<vtkImageExtractComponents> extractFilter = vtkSmartPointer<vtkImageExtractComponents>::New();
   vtkImagePyramid *Pyramid;
@@ -120,16 +117,11 @@ int main(int argc, char* argv[])
   glob = fileReaderObjectCreation(argc, argv);
   for (int ImageNumber = 0; ImageNumber < glob->GetNumberOfFileNames(); ImageNumber++)
     {
+//      Get input image
+    vtkSmartPointer<vtkImageData> inputImage;
+    inputImage = readInputImage(glob, ImageNumber);
 
-    std::string inputFilename = glob->GetNthFileName(ImageNumber);
-    cout << inputFilename << "\n";
-
-      // Read the file
-    imageReader = readerFactory->CreateImageReader2(inputFilename.c_str());
-    imageReader->SetFileName(inputFilename.c_str());
-    imageReader->Update();
-
-    yiqFilter->SetInputConnection(imageReader->GetOutputPort());
+    yiqFilter->SetInputData(inputImage);
     yiqFilter->Update();
 
     for (int color_channel=0; color_channel<3; color_channel++){
