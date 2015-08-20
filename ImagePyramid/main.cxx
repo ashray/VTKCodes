@@ -33,11 +33,8 @@
 #include <vtkImageData.h>
 #include <vtkImageDifference.h>
 
-#include <vtkImageExtractComponents.h>
 #include <vtkImageMapper3D.h>
 #include <vtkImageMathematics.h>
-#include <vtkImageReader2.h>
-#include <vtkImageReader2Factory.h>
 #include <vtkImageRGBToYIQ.h>
 #include <vtkImageSincInterpolator.h>
 #include <vtkImageViewer2.h>
@@ -68,11 +65,8 @@ int main(int argc, char* argv[])
 
   int frameSize[NumberOfPyramidLevels];
 
-  vtkSmartPointer<vtkImageWeightedSum> sumFilter1 = vtkSmartPointer<vtkImageWeightedSum>::New();
-  vtkSmartPointer<vtkImageWeightedSum> sumFilter2 = vtkSmartPointer<vtkImageWeightedSum>::New();
   vtkSmartPointer<vtkImageDifference> differenceFilter = vtkSmartPointer<vtkImageDifference>::New();
-  vtkSmartPointer<vtkImageMathematics> differenceBooster = vtkSmartPointer<vtkImageMathematics>::New();
-  vtkSmartPointer<vtkImageMathematics> imageMath = vtkSmartPointer<vtkImageMathematics>::New();
+
   vtkSmartPointer<vtkImageMathematics> chromaticCorrection = vtkSmartPointer<vtkImageMathematics>::New();
   vtkSmartPointer<vtkImageWeightedSum> addDifferenceOrigFrameFilter = vtkSmartPointer<vtkImageWeightedSum>::New();
   vtkSmartPointer<vtkImageMathematics> IntensityNormalisation = vtkSmartPointer<vtkImageMathematics>::New();
@@ -92,18 +86,12 @@ int main(int argc, char* argv[])
     lowPass2[i] = NULL;
   }
 
-  sumFilter1->SetWeight(0,r1);
-  sumFilter1->SetWeight(1,(1-r1));
-  sumFilter2->SetWeight(0,r2);
-  sumFilter2->SetWeight(1,(1-r2));
-
   differenceFilter->AllowShiftOff();
   differenceFilter->AveragingOff();
   differenceFilter->SetAllowShift(0);
   differenceFilter->SetThreshold(0);
-  imageMath->SetOperationToSubtract();
 
-  differenceBooster->SetOperationToMultiplyByK();
+
   chromaticCorrection->SetOperationToMultiplyByK();
   chromaticCorrection->SetConstantK(chromatic_abberation);
   addDifferenceOrigFrameFilter->SetWeight(0,.5);
@@ -138,68 +126,32 @@ int main(int argc, char* argv[])
       Pyramid = new vtkImagePyramid(colorChannelImage, NumberOfPyramidLevels);
 
 //      -------------Initialising lowPass with first frame--------------------------
-//      Initialising the Previous frame pyramid for frame 1. We initialise it to the
-//      first frame(which means first value of frame difference is going to be zero)
       if (ImageNumber==0)
       {
         lowPass1[color_channel] = new vtkImagePyramid();
         lowPass2[color_channel] = new vtkImagePyramid();
         copyLowPassVariables(lowPass1[color_channel], lowPass2[color_channel], Pyramid);
 
-        // Inserting the code below since it only needs to be done once(hence only for frame 1)
+//        Inserting the code below since it only needs to be done once(hence only for frame 1)
         if (color_channel == 0)
         {
-          getImagePyramidDimensions(Pyramid, NumberOfPyramidLevels);
-          // ----------------Get image dimensions for spatial filtering------------
-//          for (int k = 0; k < NumberOfPyramidLevels; k++) {
-//            frameSize[k] = getImageDimensions(Pyramid->vtkImagePyramidData[k]);
-//          }
+          getImagePyramidDimensions(Pyramid, NumberOfPyramidLevels, frameSize);
         }
       }
+
       else
       {
-//        Everything below is done for later frames, processing for first frame ends above
-
-        for (int k=0; k<NumberOfPyramidLevels; k++)
-        {
 //        Temporal IIR(Infinite impulse response filtering)
-          // -------Updating lowpass variable------
-          sumFilter1->SetInputData(Pyramid->vtkImagePyramidData[k]);
-          sumFilter1->AddInputData(lowPass1[color_channel]->vtkImagePyramidData[k]);
-          sumFilter1->Update();
-          lowPass1[color_channel]->vtkImagePyramidData[k]->ShallowCopy(sumFilter1->GetOutput());
-          sumFilter2->SetInputData(Pyramid->vtkImagePyramidData[k]);
-          sumFilter2->AddInputData(lowPass2[color_channel]->vtkImagePyramidData[k]);
-          sumFilter2->Update();
-          lowPass2[color_channel]->vtkImagePyramidData[k]->ShallowCopy(sumFilter2->GetOutput());
-
-          imageMath->SetInput1Data(lowPass1[color_channel]->vtkImagePyramidData[k]);
-          imageMath->SetInput2Data(lowPass2[color_channel]->vtkImagePyramidData[k]);
-          imageMath->Update();
-          differencePyramid->vtkImagePyramidData[k]->ShallowCopy(imageMath->GetOutput());
-        }
-// ------------------End of temporal filtering---------------------------
+        updateLowPassVariables(lowPass1[color_channel], lowPass2[color_channel], Pyramid);
+        pyramidDifference(lowPass1[color_channel], lowPass2[color_channel], differencePyramid, NumberOfPyramidLevels);
 
 //        Spatial filtering
-        for (int k=1; k<NumberOfPyramidLevels-1; k++) // Is separate loop than temporal filtering, because limits
-        {
-          int currAlpha = frameSize[k]/(delta*8) - 1;
-          currAlpha = currAlpha * exaggeration_factor;
-          int mutiplier = currAlpha;
-          if (mutiplier > alpha)
-          {
-            mutiplier = alpha;
-          }
-          differenceBooster->SetConstantK(mutiplier);
-          differenceBooster->SetInput1Data(differencePyramid->vtkImagePyramidData[k]);
-          differenceBooster->Update();
-          differencePyramid->vtkImagePyramidData[k]->ShallowCopy(differenceBooster->GetOutput());
-        }
+        spatialFiltering(differencePyramid, NumberOfPyramidLevels, frameSize);
 
+//        Collapse difference Pyramid
         differenceFrame = differencePyramid->Collapse();
 
-
-        //----------Chromatic Aberration to reduce noise---------------
+//        Chromatic aberration to reduce noise
         if (color_channel != YChannel)
         {
           chromaticCorrection->SetInput1Data(differenceFrame);

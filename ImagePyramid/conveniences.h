@@ -40,6 +40,7 @@ std::string showDims (vtkImageData *);
 int getImageDimensions (vtkImageData *);
 
 //Helper functions
+
 //Description:
 //Creates an image reader object setting path from command line input
 vtkSmartPointer<vtkGlobFileNames> fileReaderObjectCreation(int argc, char* argv[]);
@@ -57,9 +58,17 @@ vtkSmartPointer<vtkImageData> extractColorChannel(vtkSmartPointer<vtkImageData>a
 void copyLowPassVariables(vtkImagePyramid *lowPass1Pointer, vtkImagePyramid *lowPass2Pointer, vtkImagePyramid *inputPyramid);
 
 //Description:
-//Copy image pyramid pointed by input pyramid into lowpass1 and lowpass2
-int* getImagePyramidDimensions(vtkImagePyramid *Pyramid, int NumberOfPyramidLevels);
+//Returns dimensions of the image Pyramid levels
+void getImagePyramidDimensions(vtkImagePyramid *Pyramid, int NumberOfPyramidLevels, int *frameSize);
 
+//Description:
+//Adds input Pyramid to lowpass 1 and lowpass 2 pyramid accumulators for first step of IIR filtering
+void updateLowPassVariables(vtkImagePyramid *, vtkImagePyramid *, vtkImagePyramid *);
+
+
+void pyramidDifference(vtkImagePyramid *, vtkImagePyramid *, vtkImagePyramid *, int);
+
+void spatialFiltering(vtkImagePyramid *differencePyramid, int levelCount, int frameSize[]);
 
 #ifdef debug
 #define DEBUG printf("line number %d\n", __LINE__);
