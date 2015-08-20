@@ -61,6 +61,7 @@ int main(int argc, char* argv[])
   vtkSmartPointer<vtkGlobFileNames> glob;
   vtkSmartPointer<vtkImageRGBToYIQ> yiqFilter = vtkSmartPointer<vtkImageRGBToYIQ>::New();
   vtkSmartPointer<vtkImageExtractComponents> extractFilter = vtkSmartPointer<vtkImageExtractComponents>::New();
+  vtkSmartPointer<vtkImageData> colorChannelImage;
   vtkImagePyramid *Pyramid;
 
   vtkImagePyramid *lowPass1[3];
@@ -84,7 +85,6 @@ int main(int argc, char* argv[])
   vtkSmartPointer<vtkImageData> outputFrame[3];
   vtkSmartPointer<vtkImageData> activeOutputFrame;
   vtkSmartPointer<vtkImageYIQToRGB> rgbConversionFilter = vtkSmartPointer<vtkImageYIQToRGB>::New();
-  vtkSmartPointer<vtkImageData> activeImage;
 
 // ------Setup -----
   for(int i = 0; i < 3; i++)
@@ -121,6 +121,7 @@ int main(int argc, char* argv[])
     vtkSmartPointer<vtkImageData> inputImage;
     inputImage = readInputImage(glob, ImageNumber);
 
+//    Convert the input frame into YIQ
     yiqFilter->SetInputData(inputImage);
     yiqFilter->Update();
 
@@ -132,13 +133,10 @@ int main(int argc, char* argv[])
       // Setup done
 
       // Extract color channel
-      extractFilter->SetInputConnection(yiqFilter->GetOutputPort());
-      extractFilter->SetComponents(color_channel);
-      extractFilter->Update();
-      activeImage = extractFilter->GetOutput();
+      colorChannelImage = extractColorChannel(yiqFilter->GetOutput(), color_channel);
 
       //Create image pyramid
-      Pyramid = new vtkImagePyramid(activeImage, NumberOfPyramidLevels);
+      Pyramid = new vtkImagePyramid(colorChannelImage, NumberOfPyramidLevels);
 
 //      -------------Initialising lowPass with first frame--------------------------
 //      Initialising the Previous frame pyramid for frame 1. We initialise it to the
@@ -213,7 +211,7 @@ int main(int argc, char* argv[])
         //--------Add back frame difference to the original frame that we have read------
         // Note that we might have to multiply the intensity with a factor of 2 later(Intensity Normalisation)
 
-        addDifferenceOrigFrameFilter->SetInputData(activeImage);
+        addDifferenceOrigFrameFilter->SetInputData(colorChannelImage);
         addDifferenceOrigFrameFilter->AddInputData(differenceFrame);
         addDifferenceOrigFrameFilter->Update();
         activeOutputFrame->ShallowCopy(addDifferenceOrigFrameFilter->GetOutput());

@@ -80,10 +80,7 @@ vtkSmartPointer<vtkImageData> readInputImage(vtkSmartPointer<vtkGlobFileNames> g
 vtkSmartPointer<vtkImageData> extractColorChannel(vtkSmartPointer<vtkImageData>activeOutputFrame, int color_channel)
 {
   vtkSmartPointer<vtkImageExtractComponents> extractFilter = vtkSmartPointer<vtkImageExtractComponents>::New();
-  vtkSmartPointer<vtkImageRGBToYIQ> yiqFilter = vtkSmartPointer<vtkImageRGBToYIQ>::New();
-  yiqFilter->SetInputData(activeOutputFrame);
-  yiqFilter->Update();
-  extractFilter->SetInputConnection(yiqFilter->GetOutputPort());
+  extractFilter->SetInputData(activeOutputFrame);
   extractFilter->SetComponents(color_channel);
   extractFilter->Update();
   return extractFilter->GetOutput();
