@@ -66,7 +66,7 @@ int main(int argc, char* argv[])
   vtkSmartPointer<vtkImageMathematics> chromaticCorrection = vtkSmartPointer<vtkImageMathematics>::New();
   vtkSmartPointer<vtkImageWeightedSum> addDifferenceOrigFrameFilter = vtkSmartPointer<vtkImageWeightedSum>::New();
   vtkSmartPointer<vtkImageMathematics> IntensityNormalisation = vtkSmartPointer<vtkImageMathematics>::New();
-  vtkSmartPointer<vtkImageAppendComponents> appendFilter = vtkSmartPointer<vtkImageAppendComponents>::New();
+
 
   vtkImagePyramid *differencePyramid;
 
@@ -88,8 +88,8 @@ int main(int argc, char* argv[])
   differenceFilter->SetThreshold(0);
 
 
-  addDifferenceOrigFrameFilter->SetWeight(0,.5);
   addDifferenceOrigFrameFilter->SetWeight(1,.5);
+  addDifferenceOrigFrameFilter->SetWeight(0,.5);
   IntensityNormalisation->SetOperationToMultiplyByK();
   IntensityNormalisation->SetConstantK(2);
 // Setup done ----
@@ -147,51 +147,25 @@ int main(int argc, char* argv[])
 
 //        Chromatic aberration to reduce noise
         chromaticAberration(differenceFrame, color_channel);
-//        if (color_channel != YChannel)
-//        {
-//          chromaticCorrection->SetInput1Data(differenceFrame);
-//          chromaticCorrection->Update();
-//          differenceFrame->ShallowCopy(chromaticCorrection->GetOutput());
-//        }
 
-        //--------Add back frame difference to the original frame that we have read------
-        // Note that we might have to multiply the intensity with a factor of 2 later(Intensity Normalisation)
-
-        addDifferenceOrigFrameFilter->SetInputData(colorChannelImage);
-        addDifferenceOrigFrameFilter->AddInputData(differenceFrame);
-        addDifferenceOrigFrameFilter->Update();
-        activeOutputFrame->ShallowCopy(addDifferenceOrigFrameFilter->GetOutput());
-        IntensityNormalisation->SetInput1Data(activeOutputFrame);
-        IntensityNormalisation->Update();
-
-        // Because ShallowCopy()s don't seem to clear old data
+//        Add back frame difference to the original frame
         outputFrame[color_channel] = vtkSmartPointer<vtkImageData>::New();
-        outputFrame[color_channel]->ShallowCopy(IntensityNormalisation->GetOutput());
+        getOutputFrame(colorChannelImage, differenceFrame, outputFrame[color_channel]);
       }
-
       delete differencePyramid;
     }
 
-    // ---------------------Combine color channels in 1 image------------------------
     if(ImageNumber!=0)
     {
-      appendFilter->SetInputData(outputFrame[YChannel]);
-      appendFilter->AddInputData(outputFrame[IChannel]);
-      appendFilter->AddInputData(outputFrame[QChannel]);
-      appendFilter->Update();
+      vtkSmartPointer<vtkImageData> YIQOutputImage = vtkSmartPointer<vtkImageData>::New();
+      combinedOutputFrames(outputFrame, YIQOutputImage);
       // -------------------------------------------------------------------------------
 
-      // ---------------------Convert the YIQ frame to the RGB frame--------------------
-      rgbConversionFilter->SetInputConnection(appendFilter->GetOutputPort());
-      rgbConversionFilter->Update();
-      // -------------------------------------------------------------------------------
-
-//      TODO - Make a function to write frames
       std::string iterationNumberString = to_string(ImageNumber);
       std::string outputFileName = "OutputFrame" + iterationNumberString+".png";
       vtkSmartPointer<vtkPNGWriter> writeDifferenceFrames = vtkSmartPointer<vtkPNGWriter>::New();
       writeDifferenceFrames->SetFileName(outputFileName.c_str());
-      writeDifferenceFrames->SetInputData(rgbConversionFilter->GetOutput());
+      writeDifferenceFrames->SetInputData(YIQOutputImage);
       writeDifferenceFrames->Write();
     }
   }

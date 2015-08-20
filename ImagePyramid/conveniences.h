@@ -77,6 +77,14 @@ void spatialFiltering(vtkImagePyramid *differencePyramid, int levelCount, int fr
 //Performs chromatic aberration to reduce noise in output frames
 void chromaticAberration(vtkSmartPointer<vtkImageData> differenceFrame, int color_channel);
 
+
+void getOutputFrame(vtkSmartPointer<vtkImageData> colorChannelImage, vtkSmartPointer<vtkImageData> differenceFrame,
+                    vtkSmartPointer<vtkImageData> outputFrameColorChannel);
+
+
+void combinedOutputFrames(vtkSmartPointer<vtkImageData> *outputFrame, vtkSmartPointer<vtkImageData> YIQOutputImage);
+
+
 #ifdef debug
 #define DEBUG printf("line number %d\n", __LINE__);
 #else

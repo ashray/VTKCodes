@@ -28,6 +28,8 @@
 #include <vtkImageExtractComponents.h>
 #include <vtkImageWeightedSum.h>
 #include <vtkImageMathematics.h>
+#include <vtkImageAppendComponents.h>
+#include <vtkImageYIQToRGB.h>
 
 std::string showDims (vtkImageData *img)
 {
@@ -168,4 +170,36 @@ void chromaticAberration(vtkSmartPointer<vtkImageData> differenceFrame, int colo
     chromaticCorrection->Update();
     differenceFrame->ShallowCopy(chromaticCorrection->GetOutput());
   }
+}
+
+void getOutputFrame(vtkSmartPointer<vtkImageData> colorChannelImage, vtkSmartPointer<vtkImageData> differenceFrame,
+                    vtkSmartPointer<vtkImageData> outputFrameColorChannel)
+{
+  vtkSmartPointer<vtkImageWeightedSum> addDifferenceOrigFrameFilter = vtkSmartPointer<vtkImageWeightedSum>::New();
+  vtkSmartPointer<vtkImageMathematics> IntensityNormalisation = vtkSmartPointer<vtkImageMathematics>::New();
+  addDifferenceOrigFrameFilter->SetWeight(1,.5);
+  addDifferenceOrigFrameFilter->SetWeight(0,.5);
+  IntensityNormalisation->SetOperationToMultiplyByK();
+  IntensityNormalisation->SetConstantK(2);
+  addDifferenceOrigFrameFilter->SetInputData(colorChannelImage);
+  addDifferenceOrigFrameFilter->AddInputData(differenceFrame);
+  addDifferenceOrigFrameFilter->Update();
+  IntensityNormalisation->SetInput1Data(addDifferenceOrigFrameFilter->GetOutput());
+  IntensityNormalisation->Update();
+  outputFrameColorChannel->ShallowCopy(IntensityNormalisation->GetOutput());
+}
+
+void combinedOutputFrames(vtkSmartPointer<vtkImageData> *outputFrame, vtkSmartPointer<vtkImageData> YIQOutputImage)
+{
+  vtkSmartPointer<vtkImageAppendComponents> appendFilter = vtkSmartPointer<vtkImageAppendComponents>::New();
+  vtkSmartPointer<vtkImageYIQToRGB> rgbConversionFilter = vtkSmartPointer<vtkImageYIQToRGB>::New();
+  appendFilter->SetInputData(outputFrame[YChannel]);
+  appendFilter->AddInputData(outputFrame[IChannel]);
+  appendFilter->AddInputData(outputFrame[QChannel]);
+  appendFilter->Update();
+
+//  Convert the YIQ frame to the RGB frame
+  rgbConversionFilter->SetInputConnection(appendFilter->GetOutputPort());
+  rgbConversionFilter->Update();
+  YIQOutputImage->ShallowCopy(rgbConversionFilter->GetOutput());
 }
