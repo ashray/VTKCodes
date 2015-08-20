@@ -30,6 +30,7 @@
 #include <vtkImageMathematics.h>
 #include <vtkImageAppendComponents.h>
 #include <vtkImageYIQToRGB.h>
+#include <vtkPNGWriter.h>
 
 std::string showDims (vtkImageData *img)
 {
@@ -202,4 +203,14 @@ void combinedOutputFrames(vtkSmartPointer<vtkImageData> *outputFrame, vtkSmartPo
   rgbConversionFilter->SetInputConnection(appendFilter->GetOutputPort());
   rgbConversionFilter->Update();
   YIQOutputImage->ShallowCopy(rgbConversionFilter->GetOutput());
+}
+
+void frameWriter(vtkSmartPointer<vtkImageData> YIQOutputImage, int ImageNumber)
+{
+  std::string iterationNumberString = to_string(ImageNumber);
+  std::string outputFileName = "OutputFrame" + iterationNumberString+".png";
+  vtkSmartPointer<vtkPNGWriter> writeDifferenceFrames = vtkSmartPointer<vtkPNGWriter>::New();
+  writeDifferenceFrames->SetFileName(outputFileName.c_str());
+  writeDifferenceFrames->SetInputData(YIQOutputImage);
+  writeDifferenceFrames->Write();
 }

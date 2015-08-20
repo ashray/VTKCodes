@@ -77,12 +77,18 @@ void spatialFiltering(vtkImagePyramid *differencePyramid, int levelCount, int fr
 //Performs chromatic aberration to reduce noise in output frames
 void chromaticAberration(vtkSmartPointer<vtkImageData> differenceFrame, int color_channel);
 
-
+//Description:
+//Adds back difference and gets individual color channel of output frame
 void getOutputFrame(vtkSmartPointer<vtkImageData> colorChannelImage, vtkSmartPointer<vtkImageData> differenceFrame,
                     vtkSmartPointer<vtkImageData> outputFrameColorChannel);
 
-
+//Description:
+//Combines output frame channels, converts YIQ color domain back to RGB
 void combinedOutputFrames(vtkSmartPointer<vtkImageData> *outputFrame, vtkSmartPointer<vtkImageData> YIQOutputImage);
+
+//Description:
+//Writes output frames to disk
+void frameWriter(vtkSmartPointer<vtkImageData> YIQOutputImage, int ImageNumber);
 
 
 #ifdef debug

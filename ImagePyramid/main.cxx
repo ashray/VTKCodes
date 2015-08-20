@@ -161,12 +161,13 @@ int main(int argc, char* argv[])
       combinedOutputFrames(outputFrame, YIQOutputImage);
       // -------------------------------------------------------------------------------
 
-      std::string iterationNumberString = to_string(ImageNumber);
-      std::string outputFileName = "OutputFrame" + iterationNumberString+".png";
-      vtkSmartPointer<vtkPNGWriter> writeDifferenceFrames = vtkSmartPointer<vtkPNGWriter>::New();
-      writeDifferenceFrames->SetFileName(outputFileName.c_str());
-      writeDifferenceFrames->SetInputData(YIQOutputImage);
-      writeDifferenceFrames->Write();
+      frameWriter(YIQOutputImage, ImageNumber);
+//      std::string iterationNumberString = to_string(ImageNumber);
+//      std::string outputFileName = "OutputFrame" + iterationNumberString+".png";
+//      vtkSmartPointer<vtkPNGWriter> writeDifferenceFrames = vtkSmartPointer<vtkPNGWriter>::New();
+//      writeDifferenceFrames->SetFileName(outputFileName.c_str());
+//      writeDifferenceFrames->SetInputData(YIQOutputImage);
+//      writeDifferenceFrames->Write();
     }
   }
   return EXIT_SUCCESS;
