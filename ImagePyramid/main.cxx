@@ -60,7 +60,6 @@ int main(int argc, char* argv[])
 // --------Variable definitions ---------
   vtkSmartPointer<vtkGlobFileNames> glob;
   vtkSmartPointer<vtkImageRGBToYIQ> yiqFilter = vtkSmartPointer<vtkImageRGBToYIQ>::New();
-  vtkSmartPointer<vtkImageExtractComponents> extractFilter = vtkSmartPointer<vtkImageExtractComponents>::New();
   vtkSmartPointer<vtkImageData> colorChannelImage;
   vtkImagePyramid *Pyramid;
 
@@ -145,16 +144,16 @@ int main(int argc, char* argv[])
       {
         lowPass1[color_channel] = new vtkImagePyramid();
         lowPass2[color_channel] = new vtkImagePyramid();
-        lowPass1[color_channel]->ShallowCopy(Pyramid);
-        lowPass2[color_channel]->ShallowCopy(Pyramid);
+        copyLowPassVariables(lowPass1[color_channel], lowPass2[color_channel], Pyramid);
 
         // Inserting the code below since it only needs to be done once(hence only for frame 1)
         if (color_channel == 0)
         {
+          getImagePyramidDimensions(Pyramid, NumberOfPyramidLevels);
           // ----------------Get image dimensions for spatial filtering------------
-          for (int k = 0; k < NumberOfPyramidLevels; k++) {
-            frameSize[k] = getImageDimensions(Pyramid->vtkImagePyramidData[k]);
-          }
+//          for (int k = 0; k < NumberOfPyramidLevels; k++) {
+//            frameSize[k] = getImageDimensions(Pyramid->vtkImagePyramidData[k]);
+//          }
         }
       }
       else

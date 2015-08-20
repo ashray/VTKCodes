@@ -19,6 +19,7 @@
 #include <vtkGlobFileNames.h>
 #include <vtkSmartPointer.h>
 #include "vtkImageData.h"
+#include "vtkImagePyramid.h"
 #include <vtksys/SystemTools.hxx>
 #include <vtkImageReader2Factory.h>
 #include <vtkImageReader2.h>
@@ -84,4 +85,19 @@ vtkSmartPointer<vtkImageData> extractColorChannel(vtkSmartPointer<vtkImageData>a
   extractFilter->SetComponents(color_channel);
   extractFilter->Update();
   return extractFilter->GetOutput();
+}
+
+void copyLowPassVariables(vtkImagePyramid *lowPass1Pointer, vtkImagePyramid *lowPass2Pointer, vtkImagePyramid *inputPyramid)
+{
+  lowPass1Pointer->ShallowCopy(inputPyramid);
+  lowPass2Pointer->ShallowCopy(inputPyramid);
+}
+
+int* getImagePyramidDimensions(vtkImagePyramid *Pyramid, int NumberOfPyramidLevels)
+{
+  int frameSize[NumberOfPyramidLevels];
+  for (int k = 0; k < NumberOfPyramidLevels; k++) {
+    frameSize[k] = getImageDimensions(Pyramid->vtkImagePyramidData[k]);
+  }
+  return frameSize;
 }

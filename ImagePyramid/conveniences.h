@@ -20,6 +20,7 @@
 #include <vtkGlobFileNames.h>
 #include <vtkSmartPointer.h>
 #include <vtkImageData.h>
+#include "vtkImagePyramid.h"
 
 class vtkImageData;
 
@@ -50,6 +51,16 @@ vtkSmartPointer<vtkImageData> readInputImage(vtkSmartPointer<vtkGlobFileNames> g
 //Description:
 //Extracts a specific color channel from an image
 vtkSmartPointer<vtkImageData> extractColorChannel(vtkSmartPointer<vtkImageData>activeOutputFrame, int color_channel);
+
+//Description:
+//Copy image pyramid pointed by input pyramid into lowpass1 and lowpass2
+void copyLowPassVariables(vtkImagePyramid *lowPass1Pointer, vtkImagePyramid *lowPass2Pointer, vtkImagePyramid *inputPyramid);
+
+//Description:
+//Copy image pyramid pointed by input pyramid into lowpass1 and lowpass2
+int* getImagePyramidDimensions(vtkImagePyramid *Pyramid, int NumberOfPyramidLevels);
+
+
 #ifdef debug
 #define DEBUG printf("line number %d\n", __LINE__);
 #else
