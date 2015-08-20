@@ -14,14 +14,8 @@
 =========================================================================*/
 
 #include "conveniences.h"
-#include <sstream>
 #include <vtksys/SystemTools.hxx>
-#include <vtkGlobFileNames.h>
-#include <vtkSmartPointer.h>
-#include "vtkImageData.h"
-#include "vtkImagePyramid.h"
 #include "constants.h"
-#include <vtksys/SystemTools.hxx>
 #include <vtkImageReader2Factory.h>
 #include <vtkImageReader2.h>
 #include <vtkImageRGBToYIQ.h>
@@ -32,23 +26,12 @@
 #include <vtkImageYIQToRGB.h>
 #include <vtkPNGWriter.h>
 
-std::string showDims (vtkImageData *img)
-{
-  std::ostringstream strm;
-  int *exts;
-  exts = img->GetExtent();
-  strm << "(" << exts[1] - exts[0] << ", " << exts[3] - exts[2] << ", " << exts[5] - exts[4] << ")";
-  return strm.str();
-}
-
 int getImageDimensions (vtkImageData *img)
 {
   int *a = img->GetExtent();
   return int(pow((pow(a[1] - a[0] + 1,2) + pow(a[3] - a[2] + 1,2)), 0.5)/3);
   // 3 is an experimental constant used by the authors of the paper
 }
-
-//Helper functions
 
 vtkSmartPointer<vtkGlobFileNames> fileReaderObjectCreation(int argc, char* argv[])
 {
@@ -199,7 +182,6 @@ void combinedOutputFrames(vtkSmartPointer<vtkImageData> *outputFrame, vtkSmartPo
   appendFilter->AddInputData(outputFrame[QChannel]);
   appendFilter->Update();
 
-//  Convert the YIQ frame to the RGB frame
   rgbConversionFilter->SetInputConnection(appendFilter->GetOutputPort());
   rgbConversionFilter->Update();
   YIQOutputImage->ShallowCopy(rgbConversionFilter->GetOutput());

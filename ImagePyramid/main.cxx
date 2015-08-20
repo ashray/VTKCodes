@@ -17,32 +17,18 @@
 //by Ashray Malhotra
 //for more information see http://www.kitware.com/blog/home/post/952
 
-// #define debug
-
 #include "vtkImagePyramid.h"
-
 #include <vtkDataSetMapper.h>
 #include <vtkGlobFileNames.h>
 #include <vtkImageActor.h>
 #include <vtkImageAppendComponents.h>
-
 #include <vtkImageData.h>
-#include <vtkImageDifference.h>
-
 #include <vtkImageMapper3D.h>
-#include <vtkImageMathematics.h>
 #include <vtkImageRGBToYIQ.h>
 #include <vtkImageSincInterpolator.h>
 #include <vtkImageViewer2.h>
-#include <vtkImageWeightedSum.h>
-#include <vtkImageYIQToRGB.h>
 #include <vtkPNGWriter.h>
 #include <vtkStringArray.h>
-
-#include <vtksys/SystemTools.hxx>
-#include <cmath>
-#include <sstream>
-
 #include "conveniences.h"
 #include "constants.h"
 
@@ -55,44 +41,20 @@ int main(int argc, char* argv[])
   vtkSmartPointer<vtkImageRGBToYIQ> yiqFilter = vtkSmartPointer<vtkImageRGBToYIQ>::New();
   vtkSmartPointer<vtkImageData> colorChannelImage;
   vtkImagePyramid *Pyramid;
-
   vtkImagePyramid *lowPass1[3];
   vtkImagePyramid *lowPass2[3];
-
   int frameSize[NumberOfPyramidLevels];
-
-  vtkSmartPointer<vtkImageDifference> differenceFilter = vtkSmartPointer<vtkImageDifference>::New();
-
-  vtkSmartPointer<vtkImageMathematics> chromaticCorrection = vtkSmartPointer<vtkImageMathematics>::New();
-  vtkSmartPointer<vtkImageWeightedSum> addDifferenceOrigFrameFilter = vtkSmartPointer<vtkImageWeightedSum>::New();
-  vtkSmartPointer<vtkImageMathematics> IntensityNormalisation = vtkSmartPointer<vtkImageMathematics>::New();
-
-
   vtkImagePyramid *differencePyramid;
-
   vtkSmartPointer<vtkImageData> differenceFrame;
   vtkSmartPointer<vtkImageData> outputFrame[3];
-  vtkSmartPointer<vtkImageData> activeOutputFrame;
-  vtkSmartPointer<vtkImageYIQToRGB> rgbConversionFilter = vtkSmartPointer<vtkImageYIQToRGB>::New();
+  vtkSmartPointer<vtkImageData> YIQOutputImage = vtkSmartPointer<vtkImageData>::New();
 
-// ------Setup -----
+//  Setup
   for(int i = 0; i < 3; i++)
   {
     lowPass1[i] = NULL;
     lowPass2[i] = NULL;
   }
-
-  differenceFilter->AllowShiftOff();
-  differenceFilter->AveragingOff();
-  differenceFilter->SetAllowShift(0);
-  differenceFilter->SetThreshold(0);
-
-
-  addDifferenceOrigFrameFilter->SetWeight(1,.5);
-  addDifferenceOrigFrameFilter->SetWeight(0,.5);
-  IntensityNormalisation->SetOperationToMultiplyByK();
-  IntensityNormalisation->SetConstantK(2);
-// Setup done ----
 
 //  Creating reader to read images
   glob = fileReaderObjectCreation(argc, argv);
@@ -107,19 +69,16 @@ int main(int argc, char* argv[])
     yiqFilter->Update();
 
     for (int color_channel=0; color_channel<3; color_channel++){
-      // Setup
-        // Because ShallowCopy()s don't seem to clear old data
+//      Because ShallowCopy()s don't seem to clear old data
       differencePyramid = new vtkImagePyramid(NumberOfPyramidLevels);
-      activeOutputFrame = vtkSmartPointer<vtkImageData>::New();
-      // Setup done
 
-      // Extract color channel
+//      Extract color channel
       colorChannelImage = extractColorChannel(yiqFilter->GetOutput(), color_channel);
 
-      //Create image pyramid
+//      Create image pyramid
       Pyramid = new vtkImagePyramid(colorChannelImage, NumberOfPyramidLevels);
 
-//      -------------Initialising lowPass with first frame--------------------------
+//      Initialising lowPass with first frame
       if (ImageNumber==0)
       {
         lowPass1[color_channel] = new vtkImagePyramid();
@@ -157,17 +116,10 @@ int main(int argc, char* argv[])
 
     if(ImageNumber!=0)
     {
-      vtkSmartPointer<vtkImageData> YIQOutputImage = vtkSmartPointer<vtkImageData>::New();
       combinedOutputFrames(outputFrame, YIQOutputImage);
-      // -------------------------------------------------------------------------------
 
+//      Write output frames to disk
       frameWriter(YIQOutputImage, ImageNumber);
-//      std::string iterationNumberString = to_string(ImageNumber);
-//      std::string outputFileName = "OutputFrame" + iterationNumberString+".png";
-//      vtkSmartPointer<vtkPNGWriter> writeDifferenceFrames = vtkSmartPointer<vtkPNGWriter>::New();
-//      writeDifferenceFrames->SetFileName(outputFileName.c_str());
-//      writeDifferenceFrames->SetInputData(YIQOutputImage);
-//      writeDifferenceFrames->Write();
     }
   }
   return EXIT_SUCCESS;
