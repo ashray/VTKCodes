@@ -17,10 +17,6 @@
 //by Ashray Malhotra
 //for more information see http://www.kitware.com/blog/home/post/952
 
-#define YChannel 0
-#define IChannel 1
-#define QChannel 2
-
 // #define debug
 
 #include "vtkImagePyramid.h"
@@ -92,8 +88,6 @@ int main(int argc, char* argv[])
   differenceFilter->SetThreshold(0);
 
 
-  chromaticCorrection->SetOperationToMultiplyByK();
-  chromaticCorrection->SetConstantK(chromatic_abberation);
   addDifferenceOrigFrameFilter->SetWeight(0,.5);
   addDifferenceOrigFrameFilter->SetWeight(1,.5);
   IntensityNormalisation->SetOperationToMultiplyByK();
@@ -152,12 +146,13 @@ int main(int argc, char* argv[])
         differenceFrame = differencePyramid->Collapse();
 
 //        Chromatic aberration to reduce noise
-        if (color_channel != YChannel)
-        {
-          chromaticCorrection->SetInput1Data(differenceFrame);
-          chromaticCorrection->Update();
-          differenceFrame->ShallowCopy(chromaticCorrection->GetOutput());
-        }
+        chromaticAberration(differenceFrame, color_channel);
+//        if (color_channel != YChannel)
+//        {
+//          chromaticCorrection->SetInput1Data(differenceFrame);
+//          chromaticCorrection->Update();
+//          differenceFrame->ShallowCopy(chromaticCorrection->GetOutput());
+//        }
 
         //--------Add back frame difference to the original frame that we have read------
         // Note that we might have to multiply the intensity with a factor of 2 later(Intensity Normalisation)

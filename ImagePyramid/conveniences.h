@@ -65,10 +65,17 @@ void getImagePyramidDimensions(vtkImagePyramid *Pyramid, int NumberOfPyramidLeve
 //Adds input Pyramid to lowpass 1 and lowpass 2 pyramid accumulators for first step of IIR filtering
 void updateLowPassVariables(vtkImagePyramid *, vtkImagePyramid *, vtkImagePyramid *);
 
-
+//Description:
+//Computes difference between image Pyramids
 void pyramidDifference(vtkImagePyramid *, vtkImagePyramid *, vtkImagePyramid *, int);
 
+//Description:
+//Performs spatial filtering for Eulerian Motion Magnification
 void spatialFiltering(vtkImagePyramid *differencePyramid, int levelCount, int frameSize[]);
+
+//Description:
+//Performs chromatic aberration to reduce noise in output frames
+void chromaticAberration(vtkSmartPointer<vtkImageData> differenceFrame, int color_channel);
 
 #ifdef debug
 #define DEBUG printf("line number %d\n", __LINE__);

@@ -32,6 +32,10 @@
 #define r2 0.05
 // ---------------------------------------------------------------------------------------
 
+#define YChannel 0
+#define IChannel 1
+#define QChannel 2
+
 //User given input
 #define chromatic_abberation 0.1
 

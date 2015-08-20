@@ -141,7 +141,6 @@ void spatialFiltering(vtkImagePyramid *differencePyramid, int levelCount, int fr
 {
   vtkSmartPointer<vtkImageMathematics> differenceBooster = vtkSmartPointer<vtkImageMathematics>::New();
   differenceBooster->SetOperationToMultiplyByK();
-
   for (int k=1; k<levelCount-1; k++)
   {
     int currAlpha = frameSize[k]/(delta*8) - 1;
@@ -155,5 +154,18 @@ void spatialFiltering(vtkImagePyramid *differencePyramid, int levelCount, int fr
     differenceBooster->SetInput1Data(differencePyramid->vtkImagePyramidData[k]);
     differenceBooster->Update();
     differencePyramid->vtkImagePyramidData[k]->ShallowCopy(differenceBooster->GetOutput());
+  }
+}
+
+void chromaticAberration(vtkSmartPointer<vtkImageData> differenceFrame, int color_channel)
+{
+  vtkSmartPointer<vtkImageMathematics> chromaticCorrection = vtkSmartPointer<vtkImageMathematics>::New();
+  chromaticCorrection->SetOperationToMultiplyByK();
+  chromaticCorrection->SetConstantK(chromatic_abberation);
+  if (color_channel != YChannel)
+  {
+    chromaticCorrection->SetInput1Data(differenceFrame);
+    chromaticCorrection->Update();
+    differenceFrame->ShallowCopy(chromaticCorrection->GetOutput());
   }
 }
